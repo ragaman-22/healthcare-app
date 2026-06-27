@@ -9,9 +9,25 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.17",
+    "@radix-ui/react-dropdown-menu": "^2.1.18",
+    "@radix-ui/react-label": "^2.1.10",
+    "@radix-ui/react-select": "^2.3.1",
+    "@radix-ui/react-tabs": "^1.1.15",
+    "@radix-ui/react-toast": "^1.2.17",
+    "@react-pdf/renderer": "^4.5.1",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "jsqr": "^1.4.0",
+    "lucide-react": "^1.21.0",
     "next": "16.2.9",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "recharts": "^3.9.0",
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
