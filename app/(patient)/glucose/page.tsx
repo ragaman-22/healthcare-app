@@ -72,8 +72,8 @@ export default function GlucosePage() {
         <div className="flex gap-2">
           <CsvDownloadButton
             filename="血糖記録.csv"
-            headers={['日時', '種別', '血糖値(mg/dL)', 'HbA1c(%)', 'インスリン種類', 'インスリン単位', 'メモ']}
-            rows={records.map(r => [r.measured_at, r.type, r.glucose_level ?? '', r.hba1c ?? '', r.insulin_type ?? '', r.insulin_units ?? '', r.note ?? ''])}
+            headers={['日時', 'タイミング', '血糖値(mg/dL)', 'HbA1c(%)', 'インスリン種類', 'インスリン単位', 'メモ']}
+            rows={records.map(r => [r.measured_at, r.timing, r.glucose ?? '', r.hba1c ?? '', r.insulin_type ?? '', r.insulin_units ?? '', r.note ?? ''])}
           />
           <Button onClick={() => setShowForm(true)}>
             <Plus className="h-4 w-4 mr-1" />記録する
