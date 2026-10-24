@@ -18,7 +18,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="メインメニュー"
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden"
     >
       <ul className="mx-auto grid max-w-lg grid-cols-5">
         {ITEMS.map(({ href, label, icon: Icon, also }) => {

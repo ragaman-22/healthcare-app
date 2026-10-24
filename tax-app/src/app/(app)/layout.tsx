@@ -5,8 +5,8 @@ import { requireUser } from '@/lib/data/session'
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser()
   return (
-    <div className="min-h-dvh pb-24">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <div className="min-h-dvh pb-24 print:pb-0">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur print:hidden">
         <div className="mx-auto flex h-12 max-w-lg items-center justify-between px-4">
           <Link href="/home" className="text-sm font-bold text-brand-700">
             おかねと税金ノート
@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           )}
         </div>
       </header>
-      <main className="mx-auto max-w-lg px-4 py-4">{children}</main>
+      <main className="mx-auto max-w-lg px-4 py-4 print:max-w-none print:p-0">{children}</main>
       <BottomNav />
     </div>
   )

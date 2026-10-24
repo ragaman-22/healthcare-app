@@ -4,7 +4,6 @@ import { notFound } from 'next/navigation'
 import { Card } from '@/components/ui'
 
 const FEATURES: Record<string, { title: string; stage: string; desc: string }> = {
-  return: { title: '確定申告書の作成', stage: '第7段階', desc: '対応範囲内の青色申告決算書・収支内訳書・確定申告書を作成し、PDFで出力します。' },
   data: { title: '事業者設定・データ管理', stage: '第2段階以降', desc: 'データのエクスポートやバックアップを行います。' },
 }
 

@@ -17,6 +17,8 @@ const SOURCE = {
   transaction: { label: '取引から自動', tone: 'slate' },
   fixed_asset: { label: '固定資産', tone: 'slate' },
   depreciation: { label: '決算整理（自動）', tone: 'amber' },
+  closing: { label: '決算整理（締め済み）', tone: 'amber' },
+  opening: { label: '期首残高（繰越）', tone: 'green' },
 } as const
 
 function editHref(e: JournalEntry, kindOf: (id: string) => string | undefined) {

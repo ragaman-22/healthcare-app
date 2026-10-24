@@ -18,3 +18,13 @@ body {
   background: #f5f7fb;
   color: #0f172a;
 }
+
+@media print {
+  body {
+    background: #fff;
+  }
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}

@@ -196,7 +196,7 @@ export default async function HomePage() {
         <Quick href="/deductions" icon={HeartHandshake} label="控除・給与" />
         <Quick href="/risks" icon={ShieldAlert} label="注意点" />
         <Quick href="/simulate" icon={SlidersHorizontal} label="シミュレーション" />
-        <Quick href="/soon/return" icon={FileText} label="確定申告書" />
+        <Quick href="/return" icon={FileText} label="確定申告書" />
       </nav>
 
       <p className="text-center text-[11px] text-slate-400">

@@ -18,7 +18,8 @@ export interface JournalLine {
   memo?: string
 }
 
-export type JournalSource = 'manual' | 'transaction' | 'fixed_asset' | 'depreciation'
+/** depreciation: 表示時に自動で加える減価償却 / closing: 締め時に保存した減価償却 / opening: 前年からの繰越 */
+export type JournalSource = 'manual' | 'transaction' | 'fixed_asset' | 'depreciation' | 'closing' | 'opening'
 
 export interface JournalEntry {
   id: string

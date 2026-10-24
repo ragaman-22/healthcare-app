@@ -1,5 +1,6 @@
 import 'server-only'
 import { SYSTEM_ACCOUNTS } from '@/lib/accounting/accounts'
+import { planClosing } from '@/lib/accounting/closing'
 import { assetAcquisitionEntries, transactionEntries } from '@/lib/accounting/generate'
 import type { BooksData } from '@/lib/accounting/summary'
 import type {
@@ -13,6 +14,7 @@ import type {
 import { createClient } from '@/lib/supabase/server'
 import { demoDocumentLinkable, demoLinkDocument, demoUnlinkTransaction, resetDemoReceipts } from './receipts-store'
 import { resetDemoSchedule } from './schedule-store'
+import { resetDemoReturns } from './returns-store'
 import type { SessionUser } from './session'
 
 type NewEntry = Pick<JournalEntry, 'date' | 'description' | 'lines'>
@@ -27,7 +29,7 @@ const demoBooks = (g.__demoBooks ??= new Map())
 function demo(user: SessionUser): BooksData {
   let d = demoBooks.get(user.id)
   if (!d) {
-    d = { accounts: [...SYSTEM_ACCOUNTS], transactions: [], fixedAssets: [], entries: [] }
+    d = { accounts: [...SYSTEM_ACCOUNTS], transactions: [], fixedAssets: [], entries: [], closedYears: [] }
     demoBooks.set(user.id, d)
   }
   return d
@@ -49,6 +51,7 @@ export function resetDemoBooks(userId: string) {
   demoBooks.delete(userId)
   resetDemoReceipts(userId)
   resetDemoSchedule(userId)
+  resetDemoReturns(userId)
 }
 
 // =====================================================================
@@ -131,7 +134,7 @@ function txJson(tx: Transaction) {
 }
 
 function friendly(message: string): string {
-  if (message.includes('一致しません') || message.includes('使用できません') || message.includes('見つかりません')) return message
+  if (['一致しません', '使用できません', '見つかりません', '締め済み', '締められていません'].some((m) => message.includes(m))) return message
   return `保存に失敗しました（${message}）`
 }
 
@@ -152,11 +155,12 @@ export async function loadBooks(user: SessionUser, year: number): Promise<BooksD
       ),
       fixedAssets: d.fixedAssets,
       entries: d.entries.filter((e) => e.date >= from && e.date <= to),
+      closedYears: d.closedYears,
     }
   }
 
   const supabase = await createClient()
-  const [acc, txs, assets, entries] = await Promise.all([
+  const [acc, txs, assets, entries, closed] = await Promise.all([
     supabase.from('accounts').select('code, name, category, user_id').eq('is_active', true).order('sort_order').order('code'),
     supabase
       .from('transactions')
@@ -165,13 +169,15 @@ export async function loadBooks(user: SessionUser, year: number): Promise<BooksD
       .order('occurred_on'),
     supabase.from('fixed_assets').select('*').order('acquired_on'),
     supabase.from('journal_entries').select('*, journal_lines(*)').gte('entry_date', from).lte('entry_date', to).order('entry_date'),
+    supabase.from('tax_year_settings').select('tax_year').not('closed_at', 'is', null),
   ])
-  for (const r of [acc, txs, assets, entries]) if (r.error) throw new Error(r.error.message)
+  for (const r of [acc, txs, assets, entries, closed]) if (r.error) throw new Error(r.error.message)
   return {
     accounts: (acc.data ?? []).map((a) => ({ code: a.code, name: a.name, category: a.category, isSystem: a.user_id === null })),
     transactions: (txs.data ?? []).map(toTransaction),
     fixedAssets: (assets.data ?? []).map(toAsset),
     entries: (entries.data ?? []).map(toEntry),
+    closedYears: (closed.data ?? []).map((r) => r.tax_year),
   }
 }
 
@@ -204,10 +210,18 @@ export async function loadAccounts(user: SessionUser): Promise<Account[]> {
   return (data ?? []).map((a) => ({ code: a.code, name: a.name, category: a.category, isSystem: a.user_id === null }))
 }
 
+const CLOSED_ERROR = '締め済みの年の帳簿は変更できません（締めを取り消してから変更してください）'
+const closedIn = (d: BooksData, ...dates: (string | null | undefined)[]) =>
+  dates.some((x) => !!x && d.closedYears.includes(Number(x.slice(0, 4))))
+
 export async function saveTransaction(user: SessionUser, tx: Transaction): Promise<StoreResult> {
   const entries = transactionEntries(tx)
   if (user.isDemo) {
     const d = demo(user)
+    const prev0 = d.transactions.find((t) => t.id === tx.id)
+    if (closedIn(d, tx.occurredOn, tx.kind === 'sale' ? tx.settledOn : null, prev0?.occurredOn, prev0?.kind === 'sale' ? prev0.settledOn : null)) {
+      return { error: CLOSED_ERROR }
+    }
     const docId = tx.kind === 'expense' ? tx.documentId : null
     if (docId && !demoDocumentLinkable(user.id, docId, tx.id)) return { error: '証憑が見つからないか、別の取引に登録済みです' }
     const prev = d.transactions.find((t) => t.id === tx.id)
@@ -226,6 +240,8 @@ export async function saveTransaction(user: SessionUser, tx: Transaction): Promi
 export async function deleteTransaction(user: SessionUser, id: string): Promise<StoreResult> {
   if (user.isDemo) {
     const d = demo(user)
+    const t = d.transactions.find((x) => x.id === id)
+    if (t && closedIn(d, t.occurredOn, t.kind === 'sale' ? t.settledOn : null)) return { error: CLOSED_ERROR }
     d.transactions = d.transactions.filter((t) => t.id !== id)
     d.entries = d.entries.filter((e) => e.transactionId !== id)
     demoUnlinkTransaction(user.id, id)
@@ -240,6 +256,14 @@ export async function saveFixedAsset(user: SessionUser, asset: FixedAsset): Prom
   const entries = assetAcquisitionEntries(asset)
   if (user.isDemo) {
     const d = demo(user)
+    const prev = d.fixedAssets.find((a) => a.id === asset.id)
+    const onlyDisposal =
+      !!prev &&
+      (['name', 'accountCode', 'acquiredOn', 'startedUseOn', 'cost', 'usefulLife', 'businessRatio', 'paymentAccountCode'] as const).every(
+        (k) => prev[k] === asset[k],
+      ) &&
+      !closedIn(d, asset.disposedOn, prev.disposedOn)
+    if (!onlyDisposal && closedIn(d, asset.acquiredOn, prev?.acquiredOn, asset.disposedOn, prev?.disposedOn)) return { error: CLOSED_ERROR }
     d.fixedAssets = [...d.fixedAssets.filter((a) => a.id !== asset.id), asset]
     demoReplaceLinked(d, { fixedAssetId: asset.id }, entries)
     return {}
@@ -267,6 +291,8 @@ export async function saveFixedAsset(user: SessionUser, asset: FixedAsset): Prom
 export async function deleteFixedAsset(user: SessionUser, id: string): Promise<StoreResult> {
   if (user.isDemo) {
     const d = demo(user)
+    const a = d.fixedAssets.find((x) => x.id === id)
+    if (a && closedIn(d, a.acquiredOn, a.disposedOn)) return { error: CLOSED_ERROR }
     d.fixedAssets = d.fixedAssets.filter((a) => a.id !== id)
     d.entries = d.entries.filter((e) => e.fixedAssetId !== id)
     return {}
@@ -281,6 +307,7 @@ export async function saveManualEntry(user: SessionUser, id: string | null, entr
     const d = demo(user)
     const old = id ? d.entries.find((e) => e.id === id && e.source === 'manual') : undefined
     if (id && !old) return { error: '手入力の仕訳が見つかりません' }
+    if (closedIn(d, entry.date, old?.date)) return { error: CLOSED_ERROR }
     d.entries = d.entries.filter((e) => e !== old)
     d.entries.push({ ...entry, id: newId(), source: 'manual', transactionId: null, fixedAssetId: null, version: (old?.version ?? 0) + 1 })
     return {}
@@ -293,6 +320,8 @@ export async function saveManualEntry(user: SessionUser, id: string | null, entr
 export async function deleteManualEntry(user: SessionUser, id: string): Promise<StoreResult> {
   if (user.isDemo) {
     const d = demo(user)
+    const e = d.entries.find((x) => x.id === id)
+    if (e && closedIn(d, e.date)) return { error: CLOSED_ERROR }
     d.entries = d.entries.filter((e) => !(e.id === id && e.source === 'manual'))
     return {}
   }
@@ -367,4 +396,41 @@ export async function seedDemoBooks(user: SessionUser, year: number, today: stri
       { accountCode: '300', side: 'credit', amount: 800_000 },
     ],
   })
+}
+
+/** 年次締め: 減価償却の決算整理仕訳と、翌年1月1日の期首仕訳を保存して年を締める */
+export async function closeYear(user: SessionUser, year: number): Promise<StoreResult> {
+  const books = await loadBooks(user, year)
+  if (books.closedYears.includes(year)) return { error: `${year}年はすでに締め済みです` }
+  if (books.closedYears.includes(year + 1)) return { error: '翌年がすでに締め済みです' }
+  const plan = planClosing(books, year)
+  if (user.isDemo) {
+    const d = demo(user)
+    d.entries = d.entries.filter((e) => !(e.source === 'closing' && e.date.startsWith(`${year}-`)) && !(e.source === 'opening' && e.date === `${year + 1}-01-01`))
+    d.entries.push(...plan.closing.map((e) => ({ ...e, id: newId(), version: 1 })))
+    if (plan.opening) d.entries.push({ ...plan.opening, id: newId(), version: 1 })
+    d.closedYears = [...d.closedYears, year]
+    return {}
+  }
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('close_year', {
+    p_year: year,
+    p_closing: plan.closing.map((e) => ({ ...entryJson(e), fixed_asset_id: e.fixedAssetId })),
+    p_opening: plan.opening ? entryJson(plan.opening) : null,
+  })
+  return error ? { error: friendly(error.message) } : {}
+}
+
+export async function reopenYear(user: SessionUser, year: number): Promise<StoreResult> {
+  if (user.isDemo) {
+    const d = demo(user)
+    if (!d.closedYears.includes(year)) return { error: `${year}年は締められていません` }
+    if (d.closedYears.includes(year + 1)) return { error: '翌年が締め済みのため、先に翌年の締めを取り消してください' }
+    d.entries = d.entries.filter((e) => !(e.source === 'closing' && e.date.startsWith(`${year}-`)) && !(e.source === 'opening' && e.date === `${year + 1}-01-01`))
+    d.closedYears = d.closedYears.filter((y) => y !== year)
+    return {}
+  }
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('reopen_year', { p_year: year })
+  return error ? { error: friendly(error.message) } : {}
 }

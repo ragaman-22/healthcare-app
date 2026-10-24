@@ -180,7 +180,16 @@ CHECK 制約：源泉徴収税額 < 金額、入金日 ≥ 計上日、経費に
 - `tax_payment_records`: 納付済みの記録。`payment_key`（`税目:年度:期`、形式を CHECK 制約で検証）、`paid_on`、`amount`。`(user_id, payment_key)` で一意
 - いずれも RLS で本人のみ
 
-## 8. 第6段階以降の設計（予定）
+## 8. 第6段階・第7段階のテーブル
+
+- `tax_year_settings.forecast_adjustment jsonb`（年末までの残りの売上・経費の見込み）
+- `tax_year_settings.closed_at`（年次締めの日時）
+- `journal_entries.source` に `closing`（締め時に保存した減価償却）・`opening`（翌年1月1日の期首残高）を追加
+- トリガー `guard_closed_year`: 締めた年の取引・仕訳・明細・固定資産の作成・変更・削除を拒否（締めた年より後の除却日・メモの変更のみ可）。締め処理の中だけ `app.closing` 設定で許可
+- 関数 `close_year(p_year, p_closing, p_opening)` / `reopen_year(p_year)`: 決算整理仕訳・期首仕訳の作成と削除、締めの状態の更新、操作履歴
+- `tax_returns`: 申告書データの版（`tax_year, version, form_type, status, rule_version, data`）。select / insert のみ
+
+## 9. 今後の設計（予定）
 
 ### tax_returns（申告書）
 - `id, user_id, tax_year, form_type（blue_return/white_statement/income_tax_return）, status（draft/checked/exported）, data jsonb, rule_version, calculation_id, pdf_path, created_at`

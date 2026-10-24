@@ -22,7 +22,7 @@ const LINKS = [
   { href: '/receipts', label: 'レシート・領収書' },
   { href: '/simulate', label: '節税・収入シミュレーション' },
   { href: '/forecast', label: '年末予測の修正' },
-  { href: '/soon/return', label: '確定申告書の作成' },
+  { href: '/return', label: '年次締め・確定申告書の作成' },
   { href: '/soon/data', label: '事業者設定・データ管理' },
 ]
 

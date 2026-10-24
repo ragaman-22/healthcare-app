@@ -67,7 +67,9 @@ export default async function BooksPage({ searchParams }: { searchParams: Promis
         </Card>
       )}
       <p className="text-xs leading-relaxed text-slate-500">
-        前年からの繰越残高（期首残高）は年次締め処理（第7段階）で対応予定です。現在は今年の仕訳のみを集計しています。
+        {books.closedYears.includes(year)
+          ? `${year}年は締め済みです（変更するには「確定申告書の作成」で締めを取り消してください）。`
+          : '前年を締めると、1月1日に期首残高（前年からの繰越）が作成されます。開業時の残高は1月1日の仕訳で登録してください。'}
       </p>
     </div>
   )
