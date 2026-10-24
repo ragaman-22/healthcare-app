@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 別プロジェクト（個人事業主向け税金管理アプリ）
+    "tax-app/**",
   ]),
 ]);
 
