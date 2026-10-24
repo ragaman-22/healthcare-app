@@ -106,6 +106,9 @@ export default async function HomePage() {
           </tbody>
         </table>
         <p className="mt-2 text-xs text-slate-500">
+          <Link href="/forecast" className="float-right ml-2 font-semibold text-brand-600 underline">
+            予測を修正
+          </Link>
           予測方法: {s.forecast.method}
           {s.depreciation > 0 && `。減価償却費 ${formatYen(s.depreciation)}（年額）は予測の経費に含めています`}
         </p>
@@ -192,7 +195,7 @@ export default async function HomePage() {
         <Quick href="/schedule" icon={CalendarDays} label="納付カレンダー" />
         <Quick href="/deductions" icon={HeartHandshake} label="控除・給与" />
         <Quick href="/risks" icon={ShieldAlert} label="注意点" />
-        <Quick href="/soon/simulate" icon={SlidersHorizontal} label="シミュレーション" />
+        <Quick href="/simulate" icon={SlidersHorizontal} label="シミュレーション" />
         <Quick href="/soon/return" icon={FileText} label="確定申告書" />
       </nav>
 

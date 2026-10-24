@@ -82,6 +82,8 @@ export interface TaxYearProfile {
   localSettings: LocalSettings | null
   /** 利用者が自分で取り置いている金額（口座残高ではなく、自己申告の目安） */
   reservedAmount: number | null
+  /** 年末予測の手入力補正（年末までの残りの見込み）。null は月平均で予測 */
+  forecastAdjustment: { remainingRevenue: number | null; remainingExpenses: number | null } | null
 }
 
 export function emptyProfile(taxYear: number): TaxYearProfile {
@@ -117,5 +119,6 @@ export function emptyProfile(taxYear: number): TaxYearProfile {
     salary: null,
     localSettings: null,
     reservedAmount: null,
+    forecastAdjustment: null,
   }
 }

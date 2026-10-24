@@ -35,6 +35,13 @@ export interface DashboardWarning {
   detail: string
 }
 
+export interface DashboardAdjust {
+  /** 売上の増減（税込） */
+  revenue?: Yen
+  /** その年の経費の増減（減価償却費などを含む） */
+  expenses?: Yen
+}
+
 export interface DashboardSummary {
   taxYear: number
   ruleVersion: string
@@ -74,6 +81,8 @@ export function buildDashboard(
   actuals?: BookActuals,
   /** 通知書で確定した翌年度の金額（住民税・国保・事業税） */
   notices: TaxNotice[] = [],
+  /** シミュレーション用: 年末予測に加える売上・経費 */
+  adjust: DashboardAdjust = {},
 ): DashboardSummary | { error: string } {
   const rules = getRules(profile.taxYear)
   if (!rules) return { error: `${profile.taxYear}年分の税務ルールは未対応です` }
@@ -92,9 +101,13 @@ export function buildDashboard(
     ytdExpenses,
     asOf,
     businessStartDate: profile.businessStartDate,
+    remainingRevenue: profile.forecastAdjustment?.remainingRevenue ?? null,
+    remainingExpenses: profile.forecastAdjustment?.remainingExpenses ?? null,
   })
   // 減価償却費は年額で確定しているため、月平均で延長せずにそのまま加える
   forecast.projectedExpenses += depreciation
+  forecast.projectedRevenue += adjust.revenue ?? 0
+  forecast.projectedExpenses += adjust.expenses ?? 0
   const projectedProfit = forecast.projectedRevenue - forecast.projectedExpenses
 
   const blueType =

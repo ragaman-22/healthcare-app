@@ -26,6 +26,7 @@ export async function saveOnboarding(json: string): Promise<{ error: string }> {
           salary: existing.salary,
           localSettings: existing.localSettings,
           reservedAmount: existing.reservedAmount,
+          forecastAdjustment: existing.forecastAdjustment,
           // 国保料率は自治体の設定画面で入力する
           nhiRates: parsed.nhiRates ?? existing.nhiRates,
         }

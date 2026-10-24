@@ -71,6 +71,7 @@ export async function loadProfile(user: SessionUser): Promise<TaxYearProfile | n
     ytdAsOf: setting.ytd_as_of,
     localSettings: (setting.local_settings as LocalSettings | null) ?? null,
     reservedAmount: toNum(setting.reserved_amount),
+    forecastAdjustment: (setting.forecast_adjustment as TaxYearProfile['forecastAdjustment']) ?? null,
   }
   for (const d of deductions ?? []) {
     const field = DEDUCTION_FIELDS[d.kind as DeductionKind]
@@ -285,14 +286,14 @@ export async function saveDeductionDetails(
 export async function saveLocalSettings(
   user: SessionUser,
   profile: TaxYearProfile,
-  patch: Partial<Pick<TaxYearProfile, 'localSettings' | 'nhiRates' | 'reservedAmount' | 'nhiMembers' | 'nhiEnrolled'>>,
+  patch: Partial<Pick<TaxYearProfile, 'localSettings' | 'nhiRates' | 'reservedAmount' | 'nhiMembers' | 'nhiEnrolled' | 'forecastAdjustment'>>,
 ): Promise<{ error?: string }> {
   const next = { ...profile, ...patch }
   if (user.isDemo) return saveProfile(user, next)
   const supabase = await createClient()
   const { data: before } = await supabase
     .from('tax_year_settings')
-    .select('local_settings, nhi_rates, reserved_amount, nhi_members, nhi_enrolled')
+    .select('local_settings, nhi_rates, reserved_amount, nhi_members, nhi_enrolled, forecast_adjustment')
     .eq('user_id', user.id)
     .eq('tax_year', profile.taxYear)
     .maybeSingle()
@@ -302,6 +303,7 @@ export async function saveLocalSettings(
     reserved_amount: next.reservedAmount,
     nhi_members: next.nhiMembers,
     nhi_enrolled: next.nhiEnrolled,
+    forecast_adjustment: next.forecastAdjustment,
   }
   const { error } = await supabase.from('tax_year_settings').update(after).eq('user_id', user.id).eq('tax_year', profile.taxYear)
   if (error) return { error: error.message }

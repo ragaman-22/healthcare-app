@@ -20,7 +20,8 @@ export async function loadDashboard(user: SessionUser, profile: TaxYearProfile) 
     loadNotices(user),
     loadPaymentRecords(user),
   ])
-  const summary = buildDashboard(profile, today, bookActuals(books, profile.taxYear), notices)
+  const actuals = bookActuals(books, profile.taxYear)
+  const summary = buildDashboard(profile, today, actuals, notices)
   const risks = checkRisks({
     year: profile.taxYear,
     today,
@@ -31,5 +32,5 @@ export async function loadDashboard(user: SessionUser, profile: TaxYearProfile) 
   const local = { ...DEFAULT_LOCAL_SETTINGS, ...profile.localSettings }
   const schedule = 'error' in summary ? [] : buildSchedule({ summary, local, notices, records })
   const reserve = reservePlan(schedule, profile.reservedAmount ?? 0, today)
-  return { summary, risks, schedule, reserve, notices, today }
+  return { summary, risks, schedule, reserve, notices, today, actuals }
 }

@@ -11,6 +11,9 @@ export interface ForecastInput {
   asOf: string
   /** 事業開始日（対象年の途中で開業した場合） */
   businessStartDate: string | null
+  /** 利用者が手入力した、年末までの残りの売上・経費の見込み（null は月平均で予測） */
+  remainingRevenue?: Yen | null
+  remainingExpenses?: Yen | null
 }
 
 export interface ForecastResult {
@@ -77,9 +80,26 @@ export function forecastYearEnd(input: ForecastInput): ForecastResult {
 
   const monthlyAvgRevenue = floorYen(input.ytdRevenue / monthsElapsed)
   const monthlyAvgExpenses = floorYen(input.ytdExpenses / monthsElapsed)
-  const projectedRevenue = input.ytdRevenue + floorYen((input.ytdRevenue / monthsElapsed) * monthsRemaining)
-  const projectedExpenses = input.ytdExpenses + floorYen((input.ytdExpenses / monthsElapsed) * monthsRemaining)
+  const manualRevenue = input.remainingRevenue ?? null
+  const manualExpenses = input.remainingExpenses ?? null
+  const projectedRevenue =
+    input.ytdRevenue + (manualRevenue ?? floorYen((input.ytdRevenue / monthsElapsed) * monthsRemaining))
+  const projectedExpenses =
+    input.ytdExpenses + (manualExpenses ?? floorYen((input.ytdExpenses / monthsElapsed) * monthsRemaining))
   const confidence: Confidence = monthsElapsed < 3 ? 'low' : monthsElapsed < 8 ? 'medium' : 'high'
+
+  if (manualRevenue !== null || manualExpenses !== null) {
+    return {
+      monthsElapsed,
+      monthsRemaining,
+      monthlyAvgRevenue,
+      monthlyAvgExpenses,
+      projectedRevenue,
+      projectedExpenses,
+      confidence,
+      method: `実績＋年末までの見込み（${[manualRevenue !== null ? '売上' : '', manualExpenses !== null ? '経費' : ''].filter(Boolean).join('・')}は手入力、それ以外は月平均）`,
+    }
+  }
 
   return {
     monthsElapsed,

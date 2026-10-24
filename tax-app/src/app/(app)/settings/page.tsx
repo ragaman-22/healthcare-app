@@ -20,7 +20,8 @@ const LINKS = [
   { href: '/accounts', label: '勘定科目' },
   { href: '/risks', label: '税務上の注意点' },
   { href: '/receipts', label: 'レシート・領収書' },
-  { href: '/soon/simulate', label: '節税・収入シミュレーション' },
+  { href: '/simulate', label: '節税・収入シミュレーション' },
+  { href: '/forecast', label: '年末予測の修正' },
   { href: '/soon/return', label: '確定申告書の作成' },
   { href: '/soon/data', label: '事業者設定・データ管理' },
 ]
