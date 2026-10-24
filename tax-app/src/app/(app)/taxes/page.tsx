@@ -2,10 +2,10 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { TaxLines } from '@/components/tax-lines'
 import { Badge, Card, SectionTitle } from '@/components/ui'
+import { loadDashboard } from '@/lib/data/dashboard'
 import { loadProfile } from '@/lib/data/profile-store'
 import { requireUser } from '@/lib/data/session'
-import { formatYen, todayJst } from '@/lib/format'
-import { buildDashboard } from '@/lib/tax/dashboard'
+import { formatYen } from '@/lib/format'
 import type { VerificationStatus } from '@/lib/tax/types'
 
 export const metadata: Metadata = { title: '税金の内訳｜おかねと税金ノート' }
@@ -21,7 +21,7 @@ export default async function TaxesPage() {
   const user = await requireUser()
   const profile = await loadProfile(user)
   if (!profile) redirect('/onboarding')
-  const s = buildDashboard(profile, todayJst())
+  const { summary: s } = await loadDashboard(user, profile)
   if ('error' in s) redirect('/onboarding')
   const it = s.incomeTax
 

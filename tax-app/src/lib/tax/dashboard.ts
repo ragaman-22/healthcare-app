@@ -1,3 +1,4 @@
+import type { BookActuals } from '@/lib/accounting/summary'
 import type { TaxYearProfile } from '@/lib/domain/profile'
 import { calcBusinessTax } from './business-tax'
 import { calcConsumptionTax } from './consumption-tax'
@@ -38,7 +39,11 @@ export interface DashboardSummary {
   ruleVersion: string
   calculatedAt: string
   asOf: string
+  /** 売上・経費の出どころ（帳簿の取引 or 初期設定の概算入力） */
+  dataSource: 'books' | 'estimate'
   ytd: { revenue: Yen; expenses: Yen; profit: Yen }
+  /** その年の減価償却費（年額。年末予測にそのまま加える） */
+  depreciation: Yen
   forecast: ForecastResult & { profit: Yen }
   incomeTax: IncomeTaxResult
   /** 申告時に精算する所得税等 */
@@ -61,14 +66,21 @@ export interface DashboardSummary {
 
 const n = (v: number | null) => v ?? 0
 
-export function buildDashboard(profile: TaxYearProfile, today: string): DashboardSummary | { error: string } {
+export function buildDashboard(
+  profile: TaxYearProfile,
+  today: string,
+  actuals?: BookActuals,
+): DashboardSummary | { error: string } {
   const rules = getRules(profile.taxYear)
   if (!rules) return { error: `${profile.taxYear}年分の税務ルールは未対応です` }
 
   const warnings: DashboardWarning[] = []
-  const asOf = profile.ytdAsOf ?? today
-  const ytdRevenue = n(profile.ytdRevenue)
-  const ytdExpenses = n(profile.ytdExpenses)
+  // 取引が1件でも登録されていれば帳簿の集計を使い、なければ初期設定の概算入力を使う
+  const useBooks = !!actuals && actuals.entryCount > 0
+  const asOf = useBooks ? today : (profile.ytdAsOf ?? today)
+  const ytdRevenue = useBooks ? actuals.revenue : n(profile.ytdRevenue)
+  const ytdExpenses = useBooks ? actuals.expenses : n(profile.ytdExpenses)
+  const depreciation = useBooks ? actuals.depreciation : 0
 
   const forecast = forecastYearEnd({
     taxYear: profile.taxYear,
@@ -77,12 +89,15 @@ export function buildDashboard(profile: TaxYearProfile, today: string): Dashboar
     asOf,
     businessStartDate: profile.businessStartDate,
   })
+  // 減価償却費は年額で確定しているため、月平均で延長せずにそのまま加える
+  forecast.projectedExpenses += depreciation
   const projectedProfit = forecast.projectedRevenue - forecast.projectedExpenses
 
   const blueType =
     profile.filingType === 'blue' && profile.blueDeductionType !== 'unknown' ? profile.blueDeductionType : 'none'
 
-  const withholdingTax = n(profile.withholdingTax)
+  // 源泉徴収税額は、初期設定の入力（年間見込み）を優先し、なければ帳簿の入金記録の合計を使う
+  const withholdingTax = profile.withholdingTax ?? (useBooks ? actuals.withholdingTax : 0)
   const estimatedTaxPrepaid = n(profile.estimatedTaxPrepaid)
   const incomeTax = calcIncomeTax(rules, {
     revenue: forecast.projectedRevenue,
@@ -199,11 +214,17 @@ export function buildDashboard(profile: TaxYearProfile, today: string): Dashboar
   const remainingAfterReserve = remainingAfterFiling - nextYearTotal
 
   // ---- 警告 ----
-  if (profile.ytdRevenue === null && profile.ytdExpenses === null) {
+  if (!useBooks && profile.ytdRevenue === null && profile.ytdExpenses === null) {
     warnings.push({
       level: 'critical',
-      title: '今年の売上・経費が未入力です',
-      detail: '金額がすべて0円として計算されています。初期設定から今年のおおよその売上・経費を入力してください。',
+      title: '今年の売上・経費が未登録です',
+      detail: '金額がすべて0円として計算されています。売上・経費を登録するか、初期設定でおおよその合計を入力してください。',
+    })
+  } else if (!useBooks) {
+    warnings.push({
+      level: 'info',
+      title: '初期設定の概算入力で計算しています',
+      detail: '売上・経費を登録すると、帳簿の集計にもとづく計算に切り替わります。',
     })
   }
   if (forecast.confidence === 'low') {
@@ -227,7 +248,7 @@ export function buildDashboard(profile: TaxYearProfile, today: string): Dashboar
       detail: '社会保険料控除を0円として計算しているため、税額が実際より高めに表示されている可能性があります。',
     })
   }
-  if (profile.withholdingTax === null) {
+  if (profile.withholdingTax === null && !(useBooks && actuals.withholdingTax > 0)) {
     warnings.push({
       level: 'info',
       title: '源泉徴収税額が未入力です',
@@ -278,7 +299,9 @@ export function buildDashboard(profile: TaxYearProfile, today: string): Dashboar
     ruleVersion: rules.version,
     calculatedAt: new Date().toISOString(),
     asOf,
+    dataSource: useBooks ? 'books' : 'estimate',
     ytd: { revenue: ytdRevenue, expenses: ytdExpenses, profit: ytdRevenue - ytdExpenses },
+    depreciation,
     forecast: { ...forecast, profit: projectedProfit },
     incomeTax,
     filingLines,
@@ -289,6 +312,6 @@ export function buildDashboard(profile: TaxYearProfile, today: string): Dashboar
     nextYearIncomplete,
     warnings,
     ruleNotes: rules.notes,
-    inputs: { profile, today, blueType, nhiRates: nhiRates.label },
+    inputs: { profile, today, blueType, nhiRates: nhiRates.label, actuals: useBooks ? actuals : null },
   }
 }

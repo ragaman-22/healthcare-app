@@ -2,6 +2,7 @@
 
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { resetDemoBooks, seedDemoBooks } from '@/lib/data/books-store'
 import { DEMO_PROFILE_COOKIE, DEMO_SESSION_COOKIE, sampleProfile } from '@/lib/data/demo'
 import { todayJst } from '@/lib/format'
 import { isSupabaseConfigured } from '@/lib/supabase/config'
@@ -56,6 +57,8 @@ export async function logout() {
     await supabase.auth.signOut()
   } else {
     const store = await cookies()
+    const id = store.get(DEMO_SESSION_COOKIE)?.value
+    if (id) resetDemoBooks(id)
     store.delete(DEMO_SESSION_COOKIE)
     store.delete(DEMO_PROFILE_COOKIE)
   }
@@ -67,10 +70,14 @@ export async function startDemo(formData: FormData) {
   if (isSupabaseConfigured()) redirect('/login')
   const store = await cookies()
   const opts = { httpOnly: true, sameSite: 'lax' as const, path: '/', maxAge: 60 * 60 * 24 * 30 }
-  store.set(DEMO_SESSION_COOKIE, '1', opts)
+  // デモの帳簿はサーバーのメモリにセッションIDごとに保持する
+  const id = crypto.randomUUID()
+  store.set(DEMO_SESSION_COOKIE, id, opts)
   if (formData.get('withSample') === '1') {
     const today = todayJst()
-    store.set(DEMO_PROFILE_COOKIE, JSON.stringify(sampleProfile(Number(today.slice(0, 4)), today)), opts)
+    const year = Number(today.slice(0, 4))
+    store.set(DEMO_PROFILE_COOKIE, JSON.stringify(sampleProfile(year, today)), opts)
+    await seedDemoBooks({ id, email: 'demo@example.com', isDemo: true }, year, today)
     redirect('/home')
   }
   store.delete(DEMO_PROFILE_COOKIE)

@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useActionState } from 'react'
 import type { AuthState } from '@/app/actions/auth'
+import { useFormAction } from '@/components/form-parts'
 import { Button, Field, inputClass } from '@/components/ui'
 
 export function AuthForm({
@@ -12,11 +12,12 @@ export function AuthForm({
   mode: 'login' | 'signup'
   action: (prev: AuthState, formData: FormData) => Promise<AuthState>
 }) {
-  const [state, formAction, pending] = useActionState(action, {})
+  // エラー時に入力したメールアドレスが消えないよう、送信後のフォームリセットを行わない
+  const { state, onSubmit, pending } = useFormAction(action, {})
   const isSignup = mode === 'signup'
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
       <Field label="メールアドレス">
         <input name="email" type="email" autoComplete="email" required className={inputClass} />
       </Field>

@@ -24,14 +24,16 @@ export function sampleProfile(taxYear: number, today: string): TaxYearProfile {
     otherDeductions: 0,
     hasSalaryIncome: 'no',
     hasOtherIncome: 'no',
-    withholdingTax: 180_000,
+    // 源泉徴収税額は帳簿の入金記録から集計する
+    withholdingTax: null,
     estimatedTaxPrepaid: 0,
     consumptionTaxStatus: 'exempt',
     businessTaxRate: 0.05,
     nhiEnrolled: 'yes',
     nhiRates: null,
-    ytdRevenue: 4_200_000,
-    ytdExpenses: 980_000,
+    // 売上・経費はサンプル取引から集計する
+    ytdRevenue: null,
+    ytdExpenses: null,
     ytdAsOf: today,
   }
 }

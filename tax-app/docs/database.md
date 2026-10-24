@@ -15,15 +15,14 @@ Supabase PostgreSQL。**金額はすべて円単位の整数（`bigint`）**。�
 | `deductions` | 控除情報（年度・種類ごと） | ✅ |
 | `tax_calculations` | 税額計算結果（入力条件・ルール版つき） | ✅ |
 | `audit_logs` | 修正・操作履歴 | ✅ |
+| `accounts` | 勘定科目 | ✅ 第2段階 |
+| `transactions` | 取引（売上・経費） | ✅ 第2段階 |
+| `journal_entries` | 仕訳ヘッダー | ✅ 第2段階 |
+| `journal_lines` | 仕訳明細 | ✅ 第2段階 |
+| `fixed_assets` | 固定資産 | ✅ 第2段階 |
 | `tax_rule_versions` | 年度別税務ルールのメタ情報 | ⏳ 第4段階 |
-| `accounts` | 勘定科目 | ⏳ 第2段階 |
-| `transactions` | 取引（売上・経費・入金） | ⏳ 第2段階 |
-| `journal_entries` | 仕訳ヘッダー | ⏳ 第2段階 |
-| `journal_lines` | 仕訳明細 | ⏳ 第2段階 |
 | `documents` | 証憑画像 | ⏳ 第3段階 |
 | `ocr_results` | OCR 読み取り結果（候補） | ⏳ 第3段階 |
-| `fixed_assets` | 固定資産 | ⏳ 第2段階 |
-| `depreciation_schedules` | 減価償却 | ⏳ 第2段階 |
 | `tax_returns` | 申告書データ | ⏳ 第7段階 |
 
 ## 2. 第1段階のテーブル
@@ -94,31 +93,63 @@ Supabase PostgreSQL。**金額はすべて円単位の整数（`bigint`）**。�
 - `user_profiles` は insert をトリガー（security definer）のみで行う。
 - 関数は `set search_path = ''` で search_path 攻撃を防止。
 
-## 4. 第2段階以降の設計（予定）
+## 4. 第2段階のテーブル（`20261101000001_stage2_books.sql`）
 
 ### accounts（勘定科目）
-- `id, user_id null（null は標準科目）, code, name, category（asset/liability/equity/revenue/expense）, tax_category（消費税区分の既定値）, is_active`
-- 標準科目（売上高、仕入高、旅費交通費、通信費、消耗品費、接待交際費、地代家賃、水道光熱費、減価償却費、事業主貸、事業主借、現金、普通預金、売掛金、買掛金 など）を seed で投入。
+| 列 | 型 | 説明 |
+|---|---|---|
+| user_id | uuid null | null は全利用者共通の標準科目（41件を投入） |
+| code | text | 標準科目は数字3桁、利用者が追加した科目は `u001` 形式 |
+| name / category | text | category: asset / liability / equity / revenue / expense |
+| sort_order / is_active | | |
 
 ### transactions（取引）
-- `id, user_id, kind（sale/expense/payment）, occurred_on（発生日）, settled_on（入金・支払日）, counterparty, amount, tax_category, withholding_tax, memo, document_id`
-- 売上の発生と入金を区別する（売掛金の計上・消込）。
+| 列 | 説明 |
+|---|---|
+| kind | sale / expense |
+| occurred_on | 売上の計上日・経費の支払日 |
+| settled_on | 売上の入金日（未入金は null） |
+| amount / withholding_tax | 税込金額・源泉徴収税額（売上のみ） |
+| account_code | 売上高・雑収入、または経費科目 |
+| payment_account_code | 入金先・支払方法（現金・普通預金・事業主借・未払金） |
+| business_ratio / ratio_basis | 家事按分の割合（%）と根拠 |
+| tax_category | 消費税区分（記録のみ） |
+
+CHECK 制約：源泉徴収税額 < 金額、入金日 ≥ 計上日、経費には源泉徴収・入金日を持たない。
 
 ### journal_entries / journal_lines（仕訳）
-- ヘッダー：`id, user_id, entry_date, description, source（manual/ocr/transaction/closing）, transaction_id, document_id, status（draft/posted）, version`
-- 明細：`id, entry_id, line_no, account_id, side（debit/credit）, amount（>0）, tax_category, tax_amount, business_ratio（家事按分率）`
-- **貸借一致**：`posted` にする際、`sum(debit) = sum(credit)` を DB の制約トリガー（deferrable）とアプリ側の両方で検証。
-- 修正は上書きではなく `version` を上げ、変更前を `audit_logs` に保存。締め後の期間は修正不可（逆仕訳で対応）。
+- ヘッダー：`entry_date, description, source（manual / transaction / fixed_asset）, transaction_id, fixed_asset_id, version`
+- 明細：`line_no, account_code, side（debit/credit）, amount（>0）, memo`
+- 取引・固定資産から作られた仕訳は、元データの削除で cascade 削除。
+- 年末の減価償却仕訳は保存せず、固定資産台帳から帳簿表示時に自動で作成（年次締めで保存予定）。
+
+### fixed_assets（固定資産）
+`name, account_code, acquired_on, started_use_on, cost, useful_life（2〜20）, depreciation_method（straight_line）, business_ratio, payment_account_code, disposed_on, memo`
+
+### 整合性（DB 側）
+| 仕組み | 内容 |
+|---|---|
+| 遅延制約トリガー `check_journal_balance` | コミット時に、各仕訳の借方合計 = 貸方合計、かつ借方・貸方がそれぞれ存在することを検証 |
+| トリガー `check_journal_line` | 明細の科目が使用可能（標準科目 or 本人の科目）で、ヘッダーと所有者が一致すること |
+| トリガー `check_journal_entry_links` | 仕訳が参照する取引・固定資産が同じ利用者のものであること |
+
+### 保存用の関数（security invoker。RLS が適用される）
+| 関数 | 内容 |
+|---|---|
+| `save_transaction(p_tx, p_entries)` | 取引の作成・更新と仕訳の作り直しを1トランザクションで行い、変更前後を履歴に保存 |
+| `delete_transaction(p_id)` | 取引と仕訳を削除し、履歴に保存 |
+| `save_fixed_asset` / `delete_fixed_asset` | 固定資産と取得仕訳 |
+| `save_manual_entry(p_id, p_entry)` / `delete_manual_entry(p_id)` | 手入力仕訳（更新時は version を上げる） |
+
+仕訳の内容（どの科目にいくら）はアプリ側（`src/lib/accounting/generate.ts`）で作成し、テストで検証している。DB は貸借一致・所有者・科目の整合性を最終的に保証する。
+
+## 5. 第3段階以降の設計（予定）
 
 ### documents / ocr_results（証憑）
 - `documents`: `id, user_id, storage_path, sha256（重複検知）, mime_type, uploaded_at`
 - `ocr_results`: `id, document_id, raw jsonb, fields jsonb（取引日・取引先・金額・税率・明細・支払方法・勘定科目候補・事業/私用候補。読み取れない項目は null）, model, confidence, confirmed_at`
 - Storage バケットは非公開。パスは `{user_id}/...` とし、Storage ポリシーで本人のみアクセス可能にする。
 - 重複検知：画像ハッシュ一致、または「同日・同額・同取引先」の組み合わせで警告。
-
-### fixed_assets（固定資産）
-- `id, user_id, name, acquired_on, acquisition_cost, useful_life, method（straight_line 等）, business_ratio, disposal_on`
-- 10万円未満・少額減価償却資産の特例（青色・30万円未満）・一括償却資産（20万円未満）の判定は第2段階で公式資料を確認の上で実装。
 
 ### tax_returns（申告書）
 - `id, user_id, tax_year, form_type（blue_return/white_statement/income_tax_return）, status（draft/checked/exported）, data jsonb, rule_version, calculation_id, pdf_path, created_at`

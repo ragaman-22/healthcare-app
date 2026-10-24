@@ -1,14 +1,14 @@
-import { Camera, ChartColumn, FileText, ReceiptJapaneseYen, SlidersHorizontal } from 'lucide-react'
+import { BookOpen, Camera, ChartColumn, FileText, ReceiptJapaneseYen, ShieldAlert, SlidersHorizontal, Wallet } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { TaxLines } from '@/components/tax-lines'
 import { Badge, Card, SectionTitle } from '@/components/ui'
 import { Warnings } from '@/components/warnings'
+import { loadDashboard } from '@/lib/data/dashboard'
 import { loadProfile } from '@/lib/data/profile-store'
 import { requireUser } from '@/lib/data/session'
-import { formatYen, todayJst } from '@/lib/format'
-import { buildDashboard } from '@/lib/tax/dashboard'
+import { formatYen } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'ホーム｜おかねと税金ノート' }
 
@@ -23,7 +23,7 @@ export default async function HomePage() {
   const profile = await loadProfile(user)
   if (!profile) redirect('/onboarding')
 
-  const s = buildDashboard(profile, todayJst())
+  const { summary: s, risks } = await loadDashboard(user, profile)
   if ('error' in s) {
     return (
       <Card>
@@ -45,7 +45,7 @@ export default async function HomePage() {
       <div>
         <h1 className="text-lg font-bold">{s.taxYear}年分の見通し</h1>
         <p className="text-xs text-slate-500">
-          {m}月{d}日時点の入力にもとづく試算
+          {m}月{d}日時点の{s.dataSource === 'books' ? '帳簿' : '概算入力'}にもとづく試算
         </p>
       </div>
 
@@ -104,7 +104,10 @@ export default async function HomePage() {
             </tr>
           </tbody>
         </table>
-        <p className="mt-2 text-xs text-slate-500">予測方法: {s.forecast.method}</p>
+        <p className="mt-2 text-xs text-slate-500">
+          予測方法: {s.forecast.method}
+          {s.depreciation > 0 && `。減価償却費 ${formatYen(s.depreciation)}（年額）は予測の経費に含めています`}
+        </p>
       </Card>
 
       {/* 申告時に精算 */}
@@ -123,6 +126,17 @@ export default async function HomePage() {
         <TaxLines lines={s.nextYearLines} />
       </Card>
 
+      {/* 税務上の注意点 */}
+      {risks.length > 0 && (
+        <Link href="/risks" className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <ShieldAlert className="h-5 w-5 shrink-0 text-amber-700" aria-hidden />
+          <span className="text-sm">
+            <span className="font-semibold text-amber-900">帳簿で確認が必要なことが{risks.length}件あります</span>
+            <span className="block text-xs text-amber-900">{risks[0].title}</span>
+          </span>
+        </Link>
+      )}
+
       {/* 警告 */}
       <section aria-labelledby="warnings-title">
         <h2 id="warnings-title" className="mb-2 text-base font-bold">
@@ -133,12 +147,14 @@ export default async function HomePage() {
 
       {/* 主要機能 */}
       <nav aria-label="主な機能" className="grid grid-cols-3 gap-2">
+        <Quick href="/sales/new" icon={ReceiptJapaneseYen} label="売上を登録" />
+        <Quick href="/expenses/new" icon={Wallet} label="経費を登録" />
         <Quick href="/soon/receipts" icon={Camera} label="レシート撮影" />
-        <Quick href="/soon/sales" icon={ReceiptJapaneseYen} label="売上を登録" />
+        <Quick href="/books" icon={BookOpen} label="帳簿" />
+        <Quick href="/taxes" icon={ChartColumn} label="税金の内訳" />
+        <Quick href="/risks" icon={ShieldAlert} label="注意点" />
         <Quick href="/soon/simulate" icon={SlidersHorizontal} label="シミュレーション" />
-        <Quick href="/soon/books" icon={ChartColumn} label="帳簿・決算書" />
         <Quick href="/soon/return" icon={FileText} label="確定申告書" />
-        <Quick href="/taxes" icon={ChartColumn} label="計算の内訳" />
       </nav>
 
       <p className="text-center text-[11px] text-slate-400">

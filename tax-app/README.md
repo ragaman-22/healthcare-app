@@ -29,7 +29,7 @@ Supabase の環境変数が未設定の場合は **デモモード** で起動�
 ### Supabase を使う場合
 
 1. Supabase でプロジェクトを作成
-2. SQL Editor で `supabase/migrations/20261024000001_stage1_foundation.sql` を実行（または Supabase CLI で `supabase db push`）
+2. SQL Editor で `supabase/migrations/` の SQL をファイル名の順に実行（または Supabase CLI で `supabase db push`）
 3. Authentication → URL Configuration の Redirect URLs に `http://localhost:3000/auth/callback`（本番は Vercel の URL）を追加
 4. `.env.local` に `NEXT_PUBLIC_SUPABASE_URL`・`NEXT_PUBLIC_SUPABASE_ANON_KEY`・`NEXT_PUBLIC_SITE_URL` を設定
 
@@ -44,6 +44,7 @@ npm test           # 税金計算エンジンの単体テスト
 npm run typecheck
 npm run lint
 npm run build
+npm run test:db    # DB テスト（ローカルの PostgreSQL が必要）
 ```
 
 ## 注意

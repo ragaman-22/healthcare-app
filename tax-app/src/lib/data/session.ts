@@ -13,8 +13,8 @@ export interface SessionUser {
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   if (!isSupabaseConfigured()) {
-    const store = await cookies()
-    return store.get(DEMO_SESSION_COOKIE) ? { id: 'demo', email: 'demo@example.com', isDemo: true } : null
+    const id = (await cookies()).get(DEMO_SESSION_COOKIE)?.value
+    return id ? { id, email: 'demo@example.com', isDemo: true } : null
   }
   const supabase = await createClient()
   const {

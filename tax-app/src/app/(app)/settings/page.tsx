@@ -10,9 +10,13 @@ export const metadata: Metadata = { title: 'メニュー｜おかねと税金ノ
 const LINKS = [
   { href: '/onboarding', label: '申告情報・初期設定を変更' },
   { href: '/taxes', label: '税金の内訳と納付時期' },
-  { href: '/soon/books', label: '帳簿・決算書' },
+  { href: '/books', label: '帳簿（損益計算書・試算表・総勘定元帳）' },
+  { href: '/journal', label: '仕訳帳' },
+  { href: '/assets', label: '固定資産・減価償却' },
+  { href: '/accounts', label: '勘定科目' },
+  { href: '/risks', label: '税務上の注意点' },
+  { href: '/soon/receipts', label: 'レシート撮影' },
   { href: '/soon/simulate', label: '節税・収入シミュレーション' },
-  { href: '/soon/risks', label: '税務上の注意点' },
   { href: '/soon/return', label: '確定申告書の作成' },
   { href: '/soon/data', label: '事業者設定・データ管理' },
 ]

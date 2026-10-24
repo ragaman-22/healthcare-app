@@ -206,7 +206,7 @@ describe('ダッシュボード集計', () => {
     const r = buildDashboard(emptyProfile(2026), '2026-10-24')
     if ('error' in r) throw new Error(r.error)
     const titles = r.warnings.map((w) => w.title)
-    expect(titles).toContain('今年の売上・経費が未入力です')
+    expect(titles).toContain('今年の売上・経費が未登録です')
     expect(titles).toContain('社会保険料（国保・国民年金）が未入力です')
     expect(r.incomeTax.totalTax).toBe(0)
   })
@@ -235,6 +235,23 @@ describe('ダッシュボード集計', () => {
     const nextYear = r.nextYearLines.reduce((s, l) => s + (l.amount ?? 0), 0)
     expect(r.remainingAfterReserve).toBe(r.remainingAfterFiling - nextYear)
     expect(r.nextYearLines.find((l) => l.key === 'business_tax')?.amount).toBe(155_000)
+  })
+
+  it('帳簿の集計がある場合はそちらを使い、減価償却費は年額で加える', () => {
+    const p = { ...emptyProfile(2026), ytdRevenue: 999_999_999, nhiEnrolled: 'no' as const }
+    const r = buildDashboard(p, '2026-06-30', {
+      revenue: 3_000_000,
+      expenses: 600_000,
+      depreciation: 50_000,
+      withholdingTax: 120_000,
+      transactionCount: 10,
+      entryCount: 12,
+    })
+    if ('error' in r) throw new Error(r.error)
+    expect(r.dataSource).toBe('books')
+    expect(r.forecast.projectedRevenue).toBe(6_000_000)
+    expect(r.forecast.projectedExpenses).toBe(1_200_000 + 50_000)
+    expect(r.alreadyPaidIncomeTax).toBe(120_000)
   })
 
   it('未対応の年度はエラー', () => {
