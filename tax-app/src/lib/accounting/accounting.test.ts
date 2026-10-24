@@ -218,6 +218,20 @@ describe('税務上の注意点', () => {
     expect(ids).toContain('fixed-asset-check')
   })
 
+  it('確認待ちのレシートを知らせる', () => {
+    const risks = checkRisks({
+      year: 2026,
+      today: '2026-10-24',
+      transactions: [],
+      fixedAssets: [],
+      pendingReceiptDates: ['2026-10-01', '2026-10-23'],
+    })
+    const r = risks.find((x) => x.id === 'pending-receipts')
+    expect(r?.level).toBe('warning')
+    expect(r?.title).toContain('2件')
+    expect(r?.title).toContain('1件')
+  })
+
   it('売上の登録がない月を知らせる', () => {
     const risks = checkRisks({
       year: 2026,

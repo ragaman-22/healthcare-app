@@ -33,6 +33,10 @@ Supabase の環境変数が未設定の場合は **デモモード** で起動�
 3. Authentication → URL Configuration の Redirect URLs に `http://localhost:3000/auth/callback`（本番は Vercel の URL）を追加
 4. `.env.local` に `NEXT_PUBLIC_SUPABASE_URL`・`NEXT_PUBLIC_SUPABASE_ANON_KEY`・`NEXT_PUBLIC_SITE_URL` を設定
 
+### レシート読み取り（任意）
+
+`.env.local` に `ANTHROPIC_API_KEY` を設定すると、Claude でレシートを読み取ります。未設定の場合、デモモードでは仮データ、それ以外では手入力になります。
+
 ### Vercel
 
 新しいプロジェクトとしてこのリポジトリを取り込み、**Root Directory を `tax-app`** に設定して、上記の環境変数を登録します。

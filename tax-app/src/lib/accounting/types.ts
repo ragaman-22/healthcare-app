@@ -71,6 +71,8 @@ export interface ExpenseTransaction {
   ratioBasis: string
   taxCategory: TaxCategory
   memo: string
+  /** 関連付けた証憑（レシート画像）。未指定なら null */
+  documentId?: string | null
 }
 
 export type Transaction = SaleTransaction | ExpenseTransaction

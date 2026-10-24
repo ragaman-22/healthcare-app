@@ -26,4 +26,7 @@ for f in supabase/migrations/*.sql; do
   "${PSQL[@]}" -f "$f"
 done
 "${PSQL[@]}" -f supabase/tests/90_grants.sql
-"${PSQL[@]}" -f supabase/tests/rls_and_books.test.sql
+for t in supabase/tests/*.test.sql; do
+  echo "test: $t"
+  "${PSQL[@]}" -f "$t"
+done

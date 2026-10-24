@@ -15,7 +15,7 @@ const LINKS = [
   { href: '/assets', label: '固定資産・減価償却' },
   { href: '/accounts', label: '勘定科目' },
   { href: '/risks', label: '税務上の注意点' },
-  { href: '/soon/receipts', label: 'レシート撮影' },
+  { href: '/receipts', label: 'レシート・領収書' },
   { href: '/soon/simulate', label: '節税・収入シミュレーション' },
   { href: '/soon/return', label: '確定申告書の作成' },
   { href: '/soon/data', label: '事業者設定・データ管理' },

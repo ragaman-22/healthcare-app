@@ -21,8 +21,8 @@ Supabase PostgreSQL。**金額はすべて円単位の整数（`bigint`）**。�
 | `journal_lines` | 仕訳明細 | ✅ 第2段階 |
 | `fixed_assets` | 固定資産 | ✅ 第2段階 |
 | `tax_rule_versions` | 年度別税務ルールのメタ情報 | ⏳ 第4段階 |
-| `documents` | 証憑画像 | ⏳ 第3段階 |
-| `ocr_results` | OCR 読み取り結果（候補） | ⏳ 第3段階 |
+| `documents` | 証憑画像 | ✅ 第3段階 |
+| `ocr_results` | OCR 読み取り結果（候補） | ✅ 第3段階 |
 | `tax_returns` | 申告書データ | ⏳ 第7段階 |
 
 ## 2. 第1段階のテーブル
@@ -143,13 +143,32 @@ CHECK 制約：源泉徴収税額 < 金額、入金日 ≥ 計上日、経費に
 
 仕訳の内容（どの科目にいくら）はアプリ側（`src/lib/accounting/generate.ts`）で作成し、テストで検証している。DB は貸借一致・所有者・科目の整合性を最終的に保証する。
 
-## 5. 第3段階以降の設計（予定）
+## 5. 第3段階のテーブル（`20261110000001_stage3_receipts.sql`）
 
-### documents / ocr_results（証憑）
-- `documents`: `id, user_id, storage_path, sha256（重複検知）, mime_type, uploaded_at`
-- `ocr_results`: `id, document_id, raw jsonb, fields jsonb（取引日・取引先・金額・税率・明細・支払方法・勘定科目候補・事業/私用候補。読み取れない項目は null）, model, confidence, confirmed_at`
-- Storage バケットは非公開。パスは `{user_id}/...` とし、Storage ポリシーで本人のみアクセス可能にする。
-- 重複検知：画像ハッシュ一致、または「同日・同額・同取引先」の組み合わせで警告。
+### documents（証憑画像）
+| 列 | 説明 |
+|---|---|
+| storage_path | Storage のパス。`{user_id}/` で始まることを CHECK 制約で保証 |
+| sha256 | 画像のハッシュ（同じ画像の重複検出） |
+| mime_type / size_bytes | JPEG・PNG・WebP・GIF、10MB 以下 |
+| status | pending（確認待ち）/ confirmed（登録済み）/ discarded（登録しない） |
+| transaction_id | 登録した取引 |
+
+### ocr_results（読み取り結果・追記のみ）
+`provider（anthropic / demo / none）, model, fields（検証済み）, raw（AI の生の出力）, error`
+
+### transactions への追加
+`document_id`（証憑）。`save_transaction` が証憑の所有者・未登録を確認し、登録時に証憑を confirmed にする。編集時に指定がなければ既存の関連付けを維持。`delete_transaction` は証憑を pending に戻す。
+
+### Storage
+非公開バケット `receipts`（10MB・画像のみ）。ポリシーで `{auth.uid()}/` フォルダのみ読み書き・削除可能。
+
+### RLS の追加点
+- 登録済み（confirmed）の証憑は削除不可
+- OCR 結果は select / insert のみ
+- 証憑・OCR 結果・取引の相互参照は同じ利用者のものに限る（トリガー）
+
+## 6. 第4段階以降の設計（予定）
 
 ### tax_returns（申告書）
 - `id, user_id, tax_year, form_type（blue_return/white_statement/income_tax_return）, status（draft/checked/exported）, data jsonb, rule_version, calculation_id, pdf_path, created_at`

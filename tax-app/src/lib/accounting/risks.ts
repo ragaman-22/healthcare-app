@@ -32,6 +32,8 @@ export function checkRisks(input: {
   today: string
   transactions: Transaction[]
   fixedAssets: FixedAsset[]
+  /** 確認待ちのレシートの撮影日（YYYY-MM-DD） */
+  pendingReceiptDates?: string[]
 }): RiskItem[] {
   const { year, today } = input
   const txs = input.transactions.filter((t) => t.occurredOn.startsWith(`${year}-`))
@@ -142,6 +144,19 @@ export function checkRisks(input: {
       level: 'info',
       title: `家事按分している固定資産の根拠が未入力です（${assetNoMemo.length}件）`,
       detail: '事業で使う割合の根拠をメモに記録しておくと、後から説明しやすくなります。',
+      transactionIds: [],
+    })
+  }
+
+  // 9. 確認待ちのレシート
+  const pending = input.pendingReceiptDates ?? []
+  if (pending.length > 0) {
+    const old = pending.filter((d) => d <= addDays(today, -7)).length
+    risks.push({
+      id: 'pending-receipts',
+      level: old > 0 ? 'warning' : 'info',
+      title: `確認待ちのレシートが${pending.length}件あります${old > 0 ? `（うち1週間以上前のもの${old}件）` : ''}`,
+      detail: '読み取った内容を確認して登録するまで、経費として帳簿に反映されません。私用のものは「登録しない」にしてください。',
       transactionIds: [],
     })
   }

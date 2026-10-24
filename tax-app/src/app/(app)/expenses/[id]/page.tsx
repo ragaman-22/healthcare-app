@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { deleteTransactionAction } from '@/app/actions/books'
 import { EntryPreview } from '@/components/entry-preview'
@@ -19,6 +20,13 @@ export default async function EditExpensePage({ params }: { params: Promise<{ id
   return (
     <div className="space-y-4">
       <PageHeader title="経費を編集" back="/expenses" />
+      {expense.documentId && (
+        <Link href={`/receipts/${expense.documentId}`} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm">
+          {/* eslint-disable-next-line @next/next/no-img-element -- 認証付きのルートから配信する証憑画像 */}
+          <img src={`/receipts/${expense.documentId}/image`} alt="" className="h-14 w-11 rounded-md bg-slate-100 object-cover" />
+          <span>関連付けたレシートを開く</span>
+        </Link>
+      )}
       <ExpenseForm expense={expense} accounts={accounts} today={todayJst()} />
       <EntryPreview entries={expenseEntries(expense)} accounts={accountMap(accounts)} />
       <form action={deleteTransactionAction}>

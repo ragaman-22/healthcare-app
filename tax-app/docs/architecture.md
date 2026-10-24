@@ -10,7 +10,7 @@
 | 認証 | Supabase Auth（メール＋パスワード） | `@supabase/ssr` で Cookie セッション |
 | DB | Supabase PostgreSQL | すべてのテーブルに RLS |
 | ファイル | Supabase Storage | 証憑画像（第3段階） |
-| AI・OCR | 外部 AI API（未選定） | サーバー側のみから呼び出す（第3段階） |
+| AI・OCR | Claude API（`@anthropic-ai/sdk`、画像入力＋構造化出力） | サーバー側のみから呼び出す。差し替え可能な設計 |
 | テスト | Vitest | 税金計算エンジンの単体テスト |
 | ホスティング | Vercel | Root Directory を `tax-app` に設定 |
 | ソース管理 | GitHub | |
@@ -42,12 +42,14 @@ tax-app/
 │   │   │   ├── journal            仕訳帳・手入力仕訳
 │   │   │   ├── books              損益計算書・試算表・総勘定元帳
 │   │   │   ├── assets, accounts   固定資産・勘定科目
+│   │   │   ├── receipts           レシート撮影・読み取り確認・画像配信
 │   │   │   ├── risks              税務上の注意点
 │   │   │   ├── settings           メニュー・ログアウト
 │   │   │   └── soon/[feature]     未実装機能の案内
 │   │   └── actions/               Server Actions（auth, profile, books）
 │   ├── components/            UI 部品
 │   └── lib/
+│       ├── receipts/          レシート読み取り（AI 呼び出し・検証・重複検出）
 │       ├── accounting/        帳簿（仕訳の生成・検証、元帳・試算表・損益、減価償却、注意点）
 │       ├── tax/               税金計算エンジン（UI・DB から独立）
 │       │   ├── rules/         年度別税務ルール（2025, 2026）
@@ -105,12 +107,23 @@ tax-app/
 - 新規作成時の ID はサーバーで発行し、編集時はフォームの ID が本人のデータであることを確認してから保存する。
 - 年末の減価償却仕訳は固定資産台帳から表示時に作る（台帳と仕訳の不整合を避けるため）。年次締め（第7段階）で確定・保存する。
 
-## 6. AI・OCR（第3段階の方針）
+## 6. レシート読み取り（第3段階）
 
-- 画像は Supabase Storage の非公開バケットに保存し、署名付き URL で扱う。
-- OCR／AI 呼び出しは Route Handler / Server Action からのみ行い、API キーはサーバーの環境変数で管理。
-- 読み取り結果は「候補」として保存し、利用者が確認して確定するまで仕訳にしない。
-- 読み取れない項目は `null`（未確認）とし、推測値で埋めない。
+```
+撮影（端末で長辺2000px・JPEG に縮小）
+  → Server Action: 先頭バイトで形式判定・5MB 上限・SHA-256 計算
+  → Supabase Storage（非公開バケット receipts / {user_id}/{document_id}.jpg）＋ documents
+  → 読み取り（lib/receipts/reader.ts）→ 検証（sanitize.ts）→ ocr_results に追記
+  → 確認画面（重複・整合性チェック、未確認項目の表示）
+  → 利用者が確認チェックを入れて登録 → 経費の取引＋仕訳、証憑を「登録済み」に
+```
+
+- **AI は候補を出すだけ**。読み取れない項目は `null` とし、推測させない（プロンプトで指示し、サーバー側でも形式を検証して不正な値は `null` にする）。勘定科目の候補は利用者が使える費用科目のみ許可。
+- 利用者が「画像と見比べて確認しました」にチェックしない限り登録できない。
+- 読み取りの実装は差し替え可能：`ANTHROPIC_API_KEY` があれば Claude（モデルは `RECEIPT_OCR_MODEL`、既定 `claude-opus-5-5`、構造化出力、安全性判定で止まった場合のサーバー側フォールバック有効）。キーがなければ、デモモードでは「デモ用の仮データ」と明示した値、それ以外は手入力。
+- 画像は認証付きのルート（`/receipts/[id]/image`）経由で配信し、Storage を公開しない。
+- AI の生の出力（`raw`）と検証後の値（`fields`）を両方保存し、検証ロジックの改善や監査に使う。
+- 登録済みの証憑は削除できない（DB の RLS で制限）。取引を削除すると証憑は「確認待ち」に戻る。
 
 ## 7. 税額計算結果の保存
 
@@ -128,4 +141,5 @@ tax-app/
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ブラウザ可 | Supabase anon key（RLS 前提） |
 | `NEXT_PUBLIC_SITE_URL` | ブラウザ可 | メール確認リンクの戻り先（例: `https://example.vercel.app`） |
 | `SUPABASE_SERVICE_ROLE_KEY` | **サーバー専用** | 将来の管理処理用（現在未使用） |
-| `AI_OCR_API_KEY` | **サーバー専用** | 第3段階の OCR 用（現在未使用） |
+| `ANTHROPIC_API_KEY` | **サーバー専用** | レシート読み取り（Claude API） |
+| `RECEIPT_OCR_MODEL` | サーバー専用 | 読み取りに使うモデル（省略時 `claude-opus-5-5`） |

@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation'
 const ITEMS: { href: string; label: string; icon: typeof Home; also?: string[] }[] = [
   { href: '/home', label: 'ホーム', icon: Home },
   { href: '/sales', label: '売上', icon: ReceiptJapaneseYen },
-  { href: '/expenses', label: '経費', icon: Wallet },
+  { href: '/expenses', label: '経費', icon: Wallet, also: ['/receipts'] },
   { href: '/books', label: '帳簿', icon: BookOpen, also: ['/journal', '/assets', '/accounts'] },
   { href: '/settings', label: 'メニュー', icon: Menu },
 ]

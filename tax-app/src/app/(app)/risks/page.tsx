@@ -3,17 +3,16 @@ import Link from 'next/link'
 import { PageHeader } from '@/components/page'
 import { Card } from '@/components/ui'
 import { Warnings } from '@/components/warnings'
-import { checkRisks } from '@/lib/accounting/risks'
+import { loadDashboard } from '@/lib/data/dashboard'
 import { loadBooks } from '@/lib/data/books-store'
 import { requireBooksContext } from '@/lib/data/context'
-import { formatYen, todayJst } from '@/lib/format'
+import { formatYen } from '@/lib/format'
 
 export const metadata: Metadata = { title: '税務上の注意点｜おかねと税金ノート' }
 
 export default async function RisksPage() {
-  const { user, year } = await requireBooksContext()
-  const books = await loadBooks(user, year)
-  const risks = checkRisks({ year, today: todayJst(), transactions: books.transactions, fixedAssets: books.fixedAssets })
+  const { user, profile, year } = await requireBooksContext()
+  const [books, { risks }] = await Promise.all([loadBooks(user, year), loadDashboard(user, profile)])
   const byId = new Map(books.transactions.map((t) => [t.id, t]))
 
   return (
@@ -30,6 +29,11 @@ export default async function RisksPage() {
         risks.map((r) => (
           <div key={r.id} className="space-y-1">
             <Warnings warnings={[r]} />
+            {r.id === 'pending-receipts' && (
+              <Link href="/receipts" className="ml-6 text-xs text-brand-600 underline">
+                確認待ちのレシートを開く
+              </Link>
+            )}
             {r.transactionIds.length > 0 && (
               <ul className="ml-6 space-y-1 text-xs">
                 {r.transactionIds.slice(0, 10).map((id) => {

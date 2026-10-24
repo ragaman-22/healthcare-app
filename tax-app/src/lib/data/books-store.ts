@@ -11,6 +11,7 @@ import type {
   Transaction,
 } from '@/lib/accounting/types'
 import { createClient } from '@/lib/supabase/server'
+import { demoDocumentLinkable, demoLinkDocument, demoUnlinkTransaction, resetDemoReceipts } from './receipts-store'
 import type { SessionUser } from './session'
 
 type NewEntry = Pick<JournalEntry, 'date' | 'description' | 'lines'>
@@ -45,6 +46,7 @@ function demoReplaceLinked(d: BooksData, link: { transactionId?: string; fixedAs
 
 export function resetDemoBooks(userId: string) {
   demoBooks.delete(userId)
+  resetDemoReceipts(userId)
 }
 
 // =====================================================================
@@ -64,7 +66,7 @@ function toTransaction(r: any): Transaction {
   }
   return r.kind === 'sale'
     ? { ...base, kind: 'sale', settledOn: r.settled_on, withholdingTax: Number(r.withholding_tax) }
-    : { ...base, kind: 'expense', businessRatio: r.business_ratio, ratioBasis: r.ratio_basis }
+    : { ...base, kind: 'expense', businessRatio: r.business_ratio, ratioBasis: r.ratio_basis, documentId: r.document_id ?? null }
 }
 
 function toAsset(r: any): FixedAsset {
@@ -122,6 +124,7 @@ function txJson(tx: Transaction) {
     ratio_basis: tx.kind === 'expense' ? tx.ratioBasis : '',
     tax_category: tx.taxCategory,
     memo: tx.memo,
+    document_id: tx.kind === 'expense' ? (tx.documentId ?? null) : null,
   }
 }
 
@@ -203,8 +206,14 @@ export async function saveTransaction(user: SessionUser, tx: Transaction): Promi
   const entries = transactionEntries(tx)
   if (user.isDemo) {
     const d = demo(user)
-    d.transactions = [...d.transactions.filter((t) => t.id !== tx.id), tx]
+    const docId = tx.kind === 'expense' ? tx.documentId : null
+    if (docId && !demoDocumentLinkable(user.id, docId, tx.id)) return { error: '証憑が見つからないか、別の取引に登録済みです' }
+    const prev = d.transactions.find((t) => t.id === tx.id)
+    // 編集時に証憑の指定がなければ、既存の関連付けを維持する
+    const saved = tx.kind === 'expense' && !docId && prev?.kind === 'expense' ? { ...tx, documentId: prev.documentId ?? null } : tx
+    d.transactions = [...d.transactions.filter((t) => t.id !== tx.id), saved]
     demoReplaceLinked(d, { transactionId: tx.id }, entries)
+    if (docId) demoLinkDocument(user.id, docId, tx.id)
     return {}
   }
   const supabase = await createClient()
@@ -217,6 +226,7 @@ export async function deleteTransaction(user: SessionUser, id: string): Promise<
     const d = demo(user)
     d.transactions = d.transactions.filter((t) => t.id !== id)
     d.entries = d.entries.filter((e) => e.transactionId !== id)
+    demoUnlinkTransaction(user.id, id)
     return {}
   }
   const supabase = await createClient()

@@ -149,7 +149,7 @@ export default async function HomePage() {
       <nav aria-label="主な機能" className="grid grid-cols-3 gap-2">
         <Quick href="/sales/new" icon={ReceiptJapaneseYen} label="売上を登録" />
         <Quick href="/expenses/new" icon={Wallet} label="経費を登録" />
-        <Quick href="/soon/receipts" icon={Camera} label="レシート撮影" />
+        <Quick href="/receipts/new" icon={Camera} label="レシート撮影" />
         <Quick href="/books" icon={BookOpen} label="帳簿" />
         <Quick href="/taxes" icon={ChartColumn} label="税金の内訳" />
         <Quick href="/risks" icon={ShieldAlert} label="注意点" />
