@@ -1,4 +1,5 @@
 import 'server-only'
+import { dbError } from './errors'
 import { cookies } from 'next/headers'
 import { EMPTY_DETAILS, type DeductionDetails, type SalaryIncome } from '@/lib/domain/deductions'
 import { emptyProfile, type LocalSettings, type TaxYearProfile } from '@/lib/domain/profile'
@@ -129,7 +130,7 @@ export async function saveProfile(user: SessionUser, profile: TaxYearProfile): P
     .from('user_profiles')
     .update({ birth_date: profile.birthDate, prefecture: profile.prefecture, city: profile.city })
     .eq('id', user.id)
-  if (upErr) return { error: upErr.message }
+  if (upErr) return { error: dbError('profile', upErr) }
 
   // 事業者は現在 1利用者1事業者
   const { data: existingBiz } = await supabase.from('businesses').select('id').eq('user_id', user.id).limit(1).maybeSingle()
@@ -142,7 +143,7 @@ export async function saveProfile(user: SessionUser, profile: TaxYearProfile): P
   const bizRes = existingBiz
     ? await supabase.from('businesses').update(bizRow).eq('id', existingBiz.id).select('id').single()
     : await supabase.from('businesses').insert(bizRow).select('id').single()
-  if (bizRes.error) return { error: bizRes.error.message }
+  if (bizRes.error) return { error: dbError('profile', bizRes.error) }
 
   const { data: before } = await supabase
     .from('tax_year_settings')
@@ -178,7 +179,7 @@ export async function saveProfile(user: SessionUser, profile: TaxYearProfile): P
     .upsert(settingRow, { onConflict: 'user_id,tax_year' })
     .select('*')
     .single()
-  if (setErr) return { error: setErr.message }
+  if (setErr) return { error: dbError('profile', setErr) }
 
   for (const [kind, field] of Object.entries(DEDUCTION_FIELDS) as [DeductionKind, keyof TaxYearProfile][]) {
     const amount = profile[field] as number | null
@@ -189,7 +190,7 @@ export async function saveProfile(user: SessionUser, profile: TaxYearProfile): P
             .from('deductions')
             .upsert({ user_id: user.id, tax_year: profile.taxYear, kind, amount }, { onConflict: 'user_id,tax_year,kind' })
     const { error } = await q
-    if (error) return { error: error.message }
+    if (error) return { error: dbError('profile', error) }
   }
 
   await supabase.from('audit_logs').insert({
@@ -252,9 +253,9 @@ export async function saveDeductionDetails(
   const { data: before } = await supabase.from('deductions').select('*').eq('user_id', user.id).eq('tax_year', year)
   const detailKinds = ['family', 'life_insurance_paid', 'earthquake_insurance', 'medical', 'donation']
   const del = await supabase.from('deductions').delete().eq('user_id', user.id).eq('tax_year', year).in('kind', detailKinds)
-  if (del.error) return { error: del.error.message }
+  if (del.error) return { error: dbError('profile', del.error) }
   const ins = await supabase.from('deductions').insert(rows.map((r) => ({ ...r, user_id: user.id, tax_year: year })))
-  if (ins.error) return { error: ins.error.message }
+  if (ins.error) return { error: dbError('profile', ins.error) }
 
   const inc = salary
     ? await supabase.from('other_incomes').upsert(
@@ -262,14 +263,14 @@ export async function saveDeductionDetails(
         { onConflict: 'user_id,tax_year,kind' },
       )
     : await supabase.from('other_incomes').delete().eq('user_id', user.id).eq('tax_year', year).eq('kind', 'salary')
-  if (inc.error) return { error: inc.error.message }
+  if (inc.error) return { error: dbError('profile', inc.error) }
 
   const upd = await supabase
     .from('tax_year_settings')
     .update({ has_salary_income: next.hasSalaryIncome, has_spouse: next.hasSpouse, dependents_count: next.dependentsCount })
     .eq('user_id', user.id)
     .eq('tax_year', year)
-  if (upd.error) return { error: upd.error.message }
+  if (upd.error) return { error: dbError('profile', upd.error) }
 
   await supabase.from('audit_logs').insert({
     user_id: user.id,
@@ -306,7 +307,7 @@ export async function saveLocalSettings(
     forecast_adjustment: next.forecastAdjustment,
   }
   const { error } = await supabase.from('tax_year_settings').update(after).eq('user_id', user.id).eq('tax_year', profile.taxYear)
-  if (error) return { error: error.message }
+  if (error) return { error: dbError('profile', error) }
   await supabase.from('audit_logs').insert({
     user_id: user.id,
     entity: 'tax_year_settings',

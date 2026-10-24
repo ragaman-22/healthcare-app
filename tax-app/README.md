@@ -14,6 +14,10 @@
 - [画面設計](docs/screens.md)
 - [ロードマップ](docs/roadmap.md)
 - [テスト](docs/testing.md)
+- [セキュリティ確認](docs/security.md)
+- [専門家レビュー依頼書](docs/expert-review.md)
+- [公開準備チェックリスト](docs/release.md)
+- [所得税の照合表](docs/verification/income-tax-cases.md)
 
 ## 起動方法
 
@@ -24,7 +28,7 @@ cp .env.example .env.local   # Supabase を使う場合のみ値を設定
 npm run dev                  # http://localhost:3000
 ```
 
-Supabase の環境変数が未設定の場合は **デモモード** で起動します（ログイン不要、入力内容はブラウザの Cookie にのみ保存）。
+Supabase の環境変数が未設定の場合、開発環境では **デモモード** で起動します（ログイン不要。申告設定は Cookie、帳簿はサーバーのメモリに保存され、再起動で消えます）。本番環境では `ALLOW_DEMO_MODE=true` を設定しない限りデモモードは使えません。
 
 ### Supabase を使う場合
 
@@ -44,11 +48,9 @@ Supabase の環境変数が未設定の場合は **デモモード** で起動�
 ## テスト
 
 ```bash
-npm test           # 税金計算エンジンの単体テスト
-npm run typecheck
-npm run lint
-npm run build
+npm run check      # lint・型チェック・単体テスト・ビルド
 npm run test:db    # DB テスト（ローカルの PostgreSQL が必要）
+npm run test:e2e   # E2E（Playwright）
 ```
 
 ## 注意

@@ -42,3 +42,11 @@ next-env.d.ts
 
 # env example is committed
 !.env.example
+
+# playwright
+/test-results/
+/playwright-report/
+
+# 評価用のレシート画像・正解・結果（個人情報を含むため登録しない）
+/eval/receipts/*
+!/eval/receipts/README.md

@@ -1,4 +1,5 @@
 import { Calculator } from 'lucide-react'
+import Link from 'next/link'
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {children}
       <p className="mt-6 text-center text-xs leading-relaxed text-slate-500">
         表示される税額は入力内容にもとづく試算です。最終的な税額は申告内容・自治体の決定により確定します。
+      </p>
+      <p className="mt-2 text-center text-xs text-slate-500">
+        <Link href="/terms" className="underline">利用規約</Link>・<Link href="/privacy" className="underline">プライバシーポリシー</Link>
       </p>
     </main>
   )

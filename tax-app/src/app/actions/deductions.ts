@@ -19,7 +19,7 @@ export async function saveDeductionsAction(json: string): Promise<{ error: strin
   const parsed = parseDeductionForm(input)
   if ('error' in parsed) return parsed
   const res = await saveDeductionDetails(user, profile, parsed.details, parsed.salary)
-  if (res.error) return { error: `保存に失敗しました: ${res.error}` }
+  if (res.error) return { error: res.error }
 
   // 変更後の計算結果を、使用したルールのバージョンと入力条件付きで保存
   const saved = await loadProfile(user)

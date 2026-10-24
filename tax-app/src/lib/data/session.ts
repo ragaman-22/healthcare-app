@@ -1,7 +1,7 @@
 import 'server-only'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { isSupabaseConfigured } from '@/lib/supabase/config'
+import { isDemoAllowed, isSupabaseConfigured } from '@/lib/supabase/config'
 import { createClient } from '@/lib/supabase/server'
 import { DEMO_SESSION_COOKIE } from './demo'
 
@@ -13,6 +13,7 @@ export interface SessionUser {
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   if (!isSupabaseConfigured()) {
+    if (!isDemoAllowed()) return null
     const id = (await cookies()).get(DEMO_SESSION_COOKIE)?.value
     return id ? { id, email: 'demo@example.com', isDemo: true } : null
   }

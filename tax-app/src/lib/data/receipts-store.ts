@@ -1,4 +1,5 @@
 import 'server-only'
+import { dbError } from './errors'
 import type { ImageMediaType, ReadResult } from '@/lib/receipts/reader'
 import type { OcrResult, ReceiptDocument, ReceiptExtraction } from '@/lib/receipts/types'
 import { createClient } from '@/lib/supabase/server'
@@ -105,13 +106,17 @@ export async function createReceipt(
   }
   if (user.isDemo) {
     const d = demo(user.id)
+    if (d.docs.length >= 30) return { error: 'デモで保存できるレシート画像は30枚までです' }
     d.docs.push(doc)
     d.images.set(doc.id, input.data)
     return {}
   }
   const supabase = await createClient()
   const up = await supabase.storage.from(BUCKET).upload(storagePath, input.data, { contentType: input.mimeType, upsert: false })
-  if (up.error) return { error: `画像を保存できませんでした（${up.error.message}）` }
+  if (up.error) {
+    console.error('receipt upload failed:', up.error.message)
+    return { error: '画像を保存できませんでした。時間をおいてもう一度お試しください。' }
+  }
   const { error } = await supabase.from('documents').insert({
     id: doc.id,
     user_id: user.id,
@@ -123,7 +128,8 @@ export async function createReceipt(
   })
   if (error) {
     await supabase.storage.from(BUCKET).remove([storagePath])
-    return { error: `保存に失敗しました（${error.message}）` }
+    console.error('document insert failed:', error.message)
+    return { error: '保存に失敗しました。時間をおいてもう一度お試しください。' }
   }
   return {}
 }
@@ -210,7 +216,7 @@ export async function setReceiptStatus(user: SessionUser, id: string, status: 'p
   }
   const supabase = await createClient()
   const { error } = await supabase.from('documents').update({ status }).eq('id', id).neq('status', 'confirmed')
-  return error ? { error: error.message } : {}
+  return error ? { error: dbError('receipts', error) } : {}
 }
 
 /** 確認待ち・登録しないの証憑を削除する（登録済みは削除できない） */
@@ -227,7 +233,7 @@ export async function deleteReceipt(user: SessionUser, id: string): Promise<{ er
   }
   const supabase = await createClient()
   const { error, count } = await supabase.from('documents').delete({ count: 'exact' }).eq('id', id).neq('status', 'confirmed')
-  if (error || !count) return { error: error?.message ?? '削除できませんでした' }
+  if (error || !count) return { error: error ? dbError('receipts', error) : '削除できませんでした' }
   await supabase.storage.from(BUCKET).remove([r.doc.storagePath])
   return {}
 }

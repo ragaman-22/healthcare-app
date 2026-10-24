@@ -1,4 +1,5 @@
 import 'server-only'
+import { dbError } from './errors'
 import type { PaymentRecord, TaxNotice } from '@/lib/schedule/types'
 import { createClient } from '@/lib/supabase/server'
 import type { SessionUser } from './session'
@@ -51,7 +52,7 @@ export async function saveNotice(user: SessionUser, notice: TaxNotice): Promise<
     { user_id: user.id, tax_type: notice.taxType, fiscal_year: notice.fiscalYear, total: notice.total, installments: notice.installments },
     { onConflict: 'user_id,tax_type,fiscal_year' },
   )
-  return error ? { error: error.message } : {}
+  return error ? { error: dbError('schedule', error) } : {}
 }
 
 export async function deleteNotice(user: SessionUser, taxType: TaxNotice['taxType'], fiscalYear: number): Promise<{ error?: string }> {
@@ -62,7 +63,7 @@ export async function deleteNotice(user: SessionUser, taxType: TaxNotice['taxTyp
   }
   const supabase = await createClient()
   const { error } = await supabase.from('tax_notices').delete().eq('tax_type', taxType).eq('fiscal_year', fiscalYear)
-  return error ? { error: error.message } : {}
+  return error ? { error: dbError('schedule', error) } : {}
 }
 
 export async function setPaid(user: SessionUser, record: PaymentRecord | { key: string; paidOn: null }): Promise<{ error?: string }> {
@@ -78,5 +79,5 @@ export async function setPaid(user: SessionUser, record: PaymentRecord | { key: 
         .from('tax_payment_records')
         .upsert({ user_id: user.id, payment_key: record.key, paid_on: record.paidOn, amount: (record as PaymentRecord).amount }, { onConflict: 'user_id,payment_key' })
     : await supabase.from('tax_payment_records').delete().eq('payment_key', record.key)
-  return error ? { error: error.message } : {}
+  return error ? { error: dbError('schedule', error) } : {}
 }

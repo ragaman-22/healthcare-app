@@ -1,4 +1,5 @@
 import 'server-only'
+import { dbError } from './errors'
 import type { TaxReturnData } from '@/lib/returns/tax-return'
 import { createClient } from '@/lib/supabase/server'
 import { loadBooks } from './books-store'
@@ -99,5 +100,5 @@ export async function saveReturn(user: SessionUser, data: TaxReturnData): Promis
     .insert({ user_id: user.id, tax_year: data.year, version, form_type: data.formType, status: data.status, rule_version: data.ruleVersion, data })
     .select('id')
     .single()
-  return error ? { error: error.message } : { id: row.id }
+  return error ? { error: dbError('returns', error) } : { id: row.id }
 }

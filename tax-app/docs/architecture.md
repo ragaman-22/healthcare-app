@@ -4,14 +4,14 @@
 
 | 分類 | 採用技術 | 備考 |
 |---|---|---|
-| フレームワーク | Next.js 16（App Router） | `middleware` は `proxy` に名称変更されている点に注意 |
+| フレームワーク | Next.js 16.4（App Router） | `middleware` は `proxy` に名称変更されている点に注意。脆弱性対応のため 16.4.2 に固定 |
 | 言語 | TypeScript（strict） | |
 | UI | Tailwind CSS v4 | `@theme` でブランドカラーを定義 |
 | 認証 | Supabase Auth（メール＋パスワード） | `@supabase/ssr` で Cookie セッション |
 | DB | Supabase PostgreSQL | すべてのテーブルに RLS |
 | ファイル | Supabase Storage | 証憑画像（第3段階） |
 | AI・OCR | Claude API（`@anthropic-ai/sdk`、画像入力＋構造化出力） | サーバー側のみから呼び出す。差し替え可能な設計 |
-| テスト | Vitest | 税金計算エンジンの単体テスト |
+| テスト | Vitest・Playwright | 単体テスト・DB テスト・E2E。CI は GitHub Actions |
 | ホスティング | Vercel | Root Directory を `tax-app` に設定 |
 | ソース管理 | GitHub | |
 
@@ -94,6 +94,7 @@ tax-app/
 
 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` が未設定の場合、ログインせずに試せるデモモードで動作する。
 
+- 本番（`NODE_ENV=production`）では `ALLOW_DEMO_MODE=true` のときだけ使える（環境変数の設定漏れでログイン不要になるのを防ぐ）
 - 申告設定は httpOnly Cookie に保存
 - 帳簿（取引・仕訳・固定資産）はサーバーのメモリにセッションごとに保持（サーバーの再起動で消える。ローカル確認専用で、Vercel のようなサーバーレス環境では保持されない）
 - 画面上部に「デモモード」と表示
@@ -140,6 +141,7 @@ tax-app/
 | `NEXT_PUBLIC_SUPABASE_URL` | ブラウザ可 | Supabase プロジェクト URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ブラウザ可 | Supabase anon key（RLS 前提） |
 | `NEXT_PUBLIC_SITE_URL` | ブラウザ可 | メール確認リンクの戻り先（例: `https://example.vercel.app`） |
-| `SUPABASE_SERVICE_ROLE_KEY` | **サーバー専用** | 将来の管理処理用（現在未使用） |
+| `SUPABASE_SERVICE_ROLE_KEY` | **サーバー専用** | ログインアカウントの削除（データ管理画面） |
+| `ALLOW_DEMO_MODE` | サーバー | 本番でデモモードを許可する場合のみ `true`（E2E・検証環境用） |
 | `ANTHROPIC_API_KEY` | **サーバー専用** | レシート読み取り（Claude API） |
 | `RECEIPT_OCR_MODEL` | サーバー専用 | 読み取りに使うモデル（省略時 `claude-opus-5-5`） |

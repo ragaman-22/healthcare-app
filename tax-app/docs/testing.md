@@ -4,13 +4,14 @@
 
 | 種類 | ツール | 対象 | 状態 |
 |---|---|---|---|
-| 単体テスト | Vitest | 税金計算エンジン（給与所得・各種控除・住民税を含む）、入力検証、仕訳・帳簿・減価償却・注意点、レシート読み取り結果の検証・重複検出 | ✅ 98件 |
+| 単体テスト | Vitest | 税金計算エンジン（給与所得・各種控除・住民税を含む）、入力検証、仕訳・帳簿・減価償却・注意点、レシート読み取り結果の検証・重複検出 | ✅ 101件（＋照合用の出力・レシート評価は条件付き） |
 | 回帰テスト | Vitest | 年度別ルールごとの検証済みケース | 🟡 一部（今後拡充） |
 | 型チェック | TypeScript | 全体 | ✅ `npm run typecheck` |
 | Lint | ESLint（next/core-web-vitals） | 全体 | ✅ `npm run lint` |
 | DB テスト | PostgreSQL（`npm run test:db`） | マイグレーション適用、RLS、貸借一致、保存関数、履歴 | ✅ |
-| E2E | Playwright | ログイン→初期設定→ホーム、売上・経費・仕訳・固定資産の登録〜帳簿、レシート撮影〜登録 | 🟡 手動実行（CI 化は今後） |
-| 読み取り精度の評価 | 実レシート＋正解データ | Claude API の読み取り結果 | ⏳ API キーのある環境で実施 |
+| E2E | Playwright（`npm run test:e2e`） | 認証・公開範囲・ヘッダー、ホーム、帳簿、レシート、控除、納付、シミュレーション、年次締め〜申告書、書き出し・削除（14件） | ✅ CI で実行 |
+| 照合 | 国税庁の作成コーナー | `docs/verification/income-tax-cases.md` の10ケース | ⏳ 公開前に実施 |
+| レシート読み取りの評価 | 実レシート＋正解（`eval/receipts/`） | 日付・金額の正答率、推測した項目 | ⏳ API キーの設定後 |
 | 専門家レビュー | 税理士等 | 計算・申告書 | ⏳ 第8段階 |
 
 ## 2. 実行方法
@@ -23,7 +24,11 @@ npm run typecheck   # 型チェック
 npm run lint        # Lint
 npm run build       # 本番ビルド
 npm run test:db     # DB テスト（PostgreSQL 15 以上の initdb / pg_ctl / psql が必要）
+npm run test:e2e    # E2E（本番ビルドをデモモードで起動して実行）
+npm run check       # lint・型チェック・単体テスト・ビルドをまとめて実行
 ```
+
+CI（`.github/workflows/tax-app.yml`）では、`tax-app/` の変更時に上記をすべて実行します。
 
 `test:db` は使い捨ての PostgreSQL を起動し、Supabase の `auth` スキーマの最小限の代替（`supabase/tests/00_supabase_stub.sql`）を作ってから全マイグレーションを適用し、`supabase/tests/10_rls_and_books.test.sql・20_receipts.test.sql` を実行します。
 
@@ -44,6 +49,8 @@ npm run test:db     # DB テスト（PostgreSQL 15 以上の initdb / pg_ctl / p
 - 通知書・納付済みの記録は本人のみ。納付のキーの形式・重複を DB で拒否
 - 年次締め: 決算整理・期首仕訳の作成、締めた年の取引・仕訳・資産の変更・削除・二重の締めを拒否、締めた年より後の除却は可、翌年の登録は可、他人は締め・取り消しできない、取り消すと仕訳が消えて変更できる
 - 申告書データの版は変更できない
+- 全テーブルで RLS が有効、security definer 関数の search_path が固定、anon が実行できる関数が0件
+- データの全削除で本人のデータ（締めた年・履歴を含む）が消え、他人のデータは残る
 
 ## 3. 税金計算テストの方針
 
@@ -142,7 +149,7 @@ npm run test:db     # DB テスト（PostgreSQL 15 以上の initdb / pg_ctl / p
 - 自治体の住民税・国保の試算シミュレーターとの比較。
 - 確認結果はルールの `notes` の `status` を `verified` に更新して記録する。
 
-## 5. E2E 確認手順（現時点では手動）
+## 5. E2E の確認内容（`e2e/` で自動化済み。以下は手動確認する場合の手順）
 
 1. `.env.local` を作らずに `npm run build && npm start`（デモモード）
 2. `/home` → `/login` にリダイレクトされる

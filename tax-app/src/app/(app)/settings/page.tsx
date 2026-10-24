@@ -23,7 +23,9 @@ const LINKS = [
   { href: '/simulate', label: '節税・収入シミュレーション' },
   { href: '/forecast', label: '年末予測の修正' },
   { href: '/return', label: '年次締め・確定申告書の作成' },
-  { href: '/soon/data', label: '事業者設定・データ管理' },
+  { href: '/settings/data', label: 'データ管理（書き出し・削除）' },
+  { href: '/terms', label: '利用規約' },
+  { href: '/privacy', label: 'プライバシーポリシー' },
 ]
 
 export default async function SettingsPage() {

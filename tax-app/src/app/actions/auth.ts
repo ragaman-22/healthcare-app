@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { resetDemoBooks, seedDemoBooks } from '@/lib/data/books-store'
 import { DEMO_PROFILE_COOKIE, DEMO_SESSION_COOKIE, sampleProfile } from '@/lib/data/demo'
 import { todayJst } from '@/lib/format'
-import { isSupabaseConfigured } from '@/lib/supabase/config'
+import { isDemoAllowed, isSupabaseConfigured } from '@/lib/supabase/config'
 import { createClient } from '@/lib/supabase/server'
 
 export interface AuthState {
@@ -21,7 +21,7 @@ function credentials(formData: FormData) {
 }
 
 export async function login(_prev: AuthState, formData: FormData): Promise<AuthState> {
-  if (!isSupabaseConfigured()) return { error: 'Supabase が未設定です。デモモードをご利用ください。' }
+  if (!isSupabaseConfigured()) return { error: 'ログインは現在利用できません（サーバーの設定が必要です）。' }
   const { email, password } = credentials(formData)
   if (!email || !password) return { error: 'メールアドレスとパスワードを入力してください' }
   const supabase = await createClient()
@@ -31,7 +31,7 @@ export async function login(_prev: AuthState, formData: FormData): Promise<AuthS
 }
 
 export async function signup(_prev: AuthState, formData: FormData): Promise<AuthState> {
-  if (!isSupabaseConfigured()) return { error: 'Supabase が未設定です。デモモードをご利用ください。' }
+  if (!isSupabaseConfigured()) return { error: '新規登録は現在利用できません（サーバーの設定が必要です）。' }
   const { email, password } = credentials(formData)
   if (!email) return { error: 'メールアドレスを入力してください' }
   if (password.length < 8) return { error: 'パスワードは8文字以上にしてください' }
@@ -44,7 +44,11 @@ export async function signup(_prev: AuthState, formData: FormData): Promise<Auth
     password,
     options: { emailRedirectTo: `${origin}/auth/callback?next=/onboarding` },
   })
-  if (error) return { error: `登録できませんでした: ${error.message}` }
+  if (error) {
+    // 登録済みかどうかを詳しく伝えると、メールアドレスの存在確認に使われるため一般的な文言にする
+    console.error('signup failed:', error.message)
+    return { error: '登録できませんでした。入力内容を確認するか、時間をおいてもう一度お試しください。' }
+  }
   if (!data.session) {
     return { message: '確認メールを送信しました。メール内のリンクを開いて登録を完了してください。' }
   }
@@ -67,9 +71,15 @@ export async function logout() {
 
 /** デモモード開始（Supabase 未設定時のみ） */
 export async function startDemo(formData: FormData) {
-  if (isSupabaseConfigured()) redirect('/login')
+  if (!isDemoAllowed()) redirect('/login')
   const store = await cookies()
-  const opts = { httpOnly: true, sameSite: 'lax' as const, path: '/', maxAge: 60 * 60 * 24 * 30 }
+  const opts = {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 7,
+  }
   // デモの帳簿はサーバーのメモリにセッションIDごとに保持する
   const id = crypto.randomUUID()
   store.set(DEMO_SESSION_COOKIE, id, opts)

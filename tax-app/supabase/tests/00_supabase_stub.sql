@@ -12,3 +12,10 @@ create function auth.uid() returns uuid language sql stable as $$
 $$;
 grant usage on schema auth to anon, authenticated;
 grant execute on function auth.uid() to anon, authenticated;
+
+-- Supabase と同じく、public スキーマに作られるオブジェクトの既定の権限を anon / authenticated に付与する
+-- （マイグレーション内の revoke が有効になるよう、マイグレーションより前に設定する）
+grant usage on schema public to anon, authenticated;
+alter default privileges in schema public grant all on tables to anon, authenticated;
+alter default privileges in schema public grant all on sequences to anon, authenticated;
+alter default privileges in schema public grant execute on functions to anon, authenticated;

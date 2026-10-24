@@ -33,7 +33,7 @@ export async function saveOnboarding(json: string): Promise<{ error: string }> {
       : parsed
 
   const res = await saveProfile(user, profile)
-  if (res.error) return { error: `保存に失敗しました: ${res.error}` }
+  if (res.error) return { error: res.error }
 
   // 設定変更時点の計算結果を、使用したルールのバージョンと入力条件付きで保存
   const { summary } = await loadDashboard(user, profile)

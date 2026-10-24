@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { DEMO_SESSION_COOKIE } from '@/lib/data/demo'
 
-const PUBLIC_PATHS = ['/login', '/signup', '/auth']
+const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/terms', '/privacy', '/robots.txt']
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -11,8 +11,10 @@ export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  // デモモード（Supabase 未設定）
+  // デモモード（Supabase 未設定）。本番では ALLOW_DEMO_MODE=true の場合のみ
   if (!url || !key) {
+    const demoAllowed = process.env.NODE_ENV !== 'production' || process.env.ALLOW_DEMO_MODE === 'true'
+    if (!demoAllowed && !isPublic) return NextResponse.redirect(new URL('/login', request.url))
     if (!isPublic && !request.cookies.get(DEMO_SESSION_COOKIE)) {
       return NextResponse.redirect(new URL('/login', request.url))
     }

@@ -25,10 +25,20 @@ export type StoreResult = { error?: string }
 // =====================================================================
 const g = globalThis as unknown as { __demoBooks?: Map<string, BooksData> }
 const demoBooks = (g.__demoBooks ??= new Map())
+/** デモのメモリ使用量の上限（同時セッション数・1セッションあたりの件数） */
+const DEMO_MAX_SESSIONS = 200
+const DEMO_MAX_RECORDS = 3_000
 
 function demo(user: SessionUser): BooksData {
   let d = demoBooks.get(user.id)
   if (!d) {
+    // 古いセッションから破棄する（Map は挿入順）
+    while (demoBooks.size >= DEMO_MAX_SESSIONS) {
+      const oldest = demoBooks.keys().next().value
+      if (oldest === undefined) break
+      demoBooks.delete(oldest)
+      resetDemoReceipts(oldest)
+    }
     d = { accounts: [...SYSTEM_ACCOUNTS], transactions: [], fixedAssets: [], entries: [], closedYears: [] }
     demoBooks.set(user.id, d)
   }
@@ -133,9 +143,15 @@ function txJson(tx: Transaction) {
   }
 }
 
+/** 利用者向けのメッセージ（業務上のエラーはそのまま、それ以外は内容を出さずにログへ） */
 function friendly(message: string): string {
-  if (['一致しません', '使用できません', '見つかりません', '締め済み', '締められていません'].some((m) => message.includes(m))) return message
-  return `保存に失敗しました（${message}）`
+  if (['一致しません', '使用できません', '見つかりません', '締め済み', '締められていません', '登録済み'].some((m) => message.includes(m))) return message
+  console.error('books store error:', message)
+  return '保存に失敗しました。時間をおいてもう一度お試しください。'
+}
+
+function demoFull(d: BooksData) {
+  return d.transactions.length + d.entries.length + d.fixedAssets.length >= DEMO_MAX_RECORDS
 }
 
 // =====================================================================
@@ -222,6 +238,7 @@ export async function saveTransaction(user: SessionUser, tx: Transaction): Promi
     if (closedIn(d, tx.occurredOn, tx.kind === 'sale' ? tx.settledOn : null, prev0?.occurredOn, prev0?.kind === 'sale' ? prev0.settledOn : null)) {
       return { error: CLOSED_ERROR }
     }
+    if (!prev0 && demoFull(d)) return { error: 'デモで登録できる件数の上限に達しました' }
     const docId = tx.kind === 'expense' ? tx.documentId : null
     if (docId && !demoDocumentLinkable(user.id, docId, tx.id)) return { error: '証憑が見つからないか、別の取引に登録済みです' }
     const prev = d.transactions.find((t) => t.id === tx.id)

@@ -14,6 +14,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 画面下の固定メニューに、フォーカス・スクロールした要素が隠れないようにする */
+html {
+  scroll-padding-bottom: 6rem;
+}
+
 body {
   background: #f5f7fb;
   color: #0f172a;

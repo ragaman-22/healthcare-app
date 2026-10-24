@@ -61,10 +61,10 @@ export function NoticeForm({ year }: { year: number }) {
       {detailed && (
         <Card className="space-y-3">
           {Array.from({ length: rows }, (_, i) => (
-            <div key={i} className="grid grid-cols-[3rem_1fr_8rem] items-center gap-2">
+            <div key={i} className="grid grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,7rem)] items-center gap-2">
               <span className="text-xs text-slate-500">第{i + 1}期</span>
-              <input type="date" name={`due_${i}`} aria-label={`第${i + 1}期の納期限`} className={inputClass} />
-              <input name={`amount_${i}`} inputMode="numeric" aria-label={`第${i + 1}期の金額`} className={`${inputClass} num text-right`} />
+              <input type="date" name={`due_${i}`} aria-label={`第${i + 1}期の納期限`} className={`${inputClass} min-w-0`} />
+              <input name={`amount_${i}`} inputMode="numeric" aria-label={`第${i + 1}期の金額`} className={`${inputClass} num min-w-0 text-right`} />
             </div>
           ))}
           {rows < 12 && (
