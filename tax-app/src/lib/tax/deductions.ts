@@ -20,6 +20,11 @@ export interface DeductionResult {
   furusato: Yen
   /** 計算に関する注意（未対応の条件に該当しそうな場合など） */
   notes: string[]
+  /** 住民税の非課税判定に使う人数（本人＋同一生計配偶者＋扶養親族。16歳未満を含む） */
+  householdPersons: number
+  hasDependents: boolean
+  /** 本人が障害者・寡婦・ひとり親に該当する（合計所得135万円以下なら住民税非課税） */
+  specialPerson: boolean
 }
 
 export interface DeductionInput {
@@ -213,7 +218,13 @@ export function calcDeductions(rules: TaxRuleSet, input: DeductionInput): Deduct
   add('basic', '基礎控除', basicIt, basicRes)
   if (input.totalIncome <= 25_000_000) diff += rules.residentTax.basicDeductionDifference
 
+  const spouseCounted = !!d?.spouse && d.spouse.totalIncome !== null && d.spouse.totalIncome <= f.dependentIncomeLimit
+  const dependentCount = (d?.dependents ?? []).filter((x) => x.totalIncome !== null && x.totalIncome <= f.dependentIncomeLimit).length
+
   return {
+    householdPersons: 1 + (spouseCounted ? 1 : 0) + dependentCount,
+    hasDependents: spouseCounted || dependentCount > 0,
+    specialPerson: !!d && (d.self.disability !== 'none' || d.self.widow || d.self.singleParent !== 'none'),
     lines,
     incomeTaxTotal: lines.reduce((s, l) => s + l.incomeTax, 0),
     residentTotal: lines.reduce((s, l) => s + l.resident, 0),

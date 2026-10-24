@@ -9,6 +9,8 @@ export interface ResidentTaxInput {
   deductions: DeductionResult
   /** 所得税の限界税率（ふるさと納税の特例分の計算に使う） */
   incomeTaxMarginalRate: number
+  /** お住まいの地域の級地（均等割の非課税限度額）。未設定は1級地として判定 */
+  grade?: 1 | 2 | 3 | null
 }
 
 export interface ResidentTaxResult {
@@ -24,6 +26,14 @@ export interface ResidentTaxResult {
   incomeLevyPrefectural: Yen
   perCapita: Yen
   total: Yen
+  /** 所得割が非課税 */
+  incomeLevyExempt: boolean
+  /** 均等割も非課税（住民税がかからない） */
+  perCapitaExempt: boolean
+}
+
+function limit(rule: { perPerson: number; add: number; dependentAdd: number }, persons: number, hasDependents: boolean) {
+  return rule.perPerson * persons + rule.add + (hasDependents ? rule.dependentAdd : 0)
 }
 
 /** 市町村分（6/10）と道府県分（4/10）に分ける */
@@ -69,7 +79,16 @@ export function calcResidentTax(rules: TaxRuleSet, input: ResidentTaxInput): Res
   // 所得割は市町村民税・道府県民税それぞれ100円未満切捨て
   const incomeLevyMunicipal = floorTo(Math.max(0, levyM - creditM), 100)
   const incomeLevyPrefectural = floorTo(Math.max(0, levyP - creditP), 100)
-  const perCapita = r.perCapitaMunicipal + r.perCapitaPrefectural + r.forestEnvironmentTax
+  // 非課税の判定（総所得金額等が非課税限度額以下）
+  const nt = r.nonTaxable
+  const persons = input.deductions.householdPersons
+  const deps = input.deductions.hasDependents
+  const special = input.deductions.specialPerson && input.totalIncome <= nt.specialPersonLimit
+  const perCapitaExempt = special || input.totalIncome <= limit(nt.perCapita[input.grade ?? 1], persons, deps)
+  const incomeLevyExempt = perCapitaExempt || input.totalIncome <= limit(nt.incomeLevy, persons, deps)
+  const perCapita = perCapitaExempt ? 0 : r.perCapitaMunicipal + r.perCapitaPrefectural + r.forestEnvironmentTax
+  const levyMunicipal = incomeLevyExempt ? 0 : incomeLevyMunicipal
+  const levyPrefectural = incomeLevyExempt ? 0 : incomeLevyPrefectural
 
   return {
     basicDeduction,
@@ -78,9 +97,11 @@ export function calcResidentTax(rules: TaxRuleSet, input: ResidentTaxInput): Res
     adjustmentDeduction: adjMunicipal + adjPrefectural,
     donationCredit: Math.min(creditM, levyM) + Math.min(creditP, levyP),
     donationCapped,
-    incomeLevyMunicipal,
-    incomeLevyPrefectural,
+    incomeLevyMunicipal: levyMunicipal,
+    incomeLevyPrefectural: levyPrefectural,
     perCapita,
-    total: incomeLevyMunicipal + incomeLevyPrefectural + perCapita,
+    total: levyMunicipal + levyPrefectural + perCapita,
+    incomeLevyExempt,
+    perCapitaExempt,
   }
 }

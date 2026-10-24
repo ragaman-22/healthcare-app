@@ -67,6 +67,24 @@ export interface TaxRuleSet {
     basicDeductionDifference: Yen
     /** 生命保険料控除の住民税上限（概算に使用） */
     lifeInsuranceDeductionCap: Yen
+    /**
+     * 非課税限度額: 総所得金額等 ≤ perPerson × 人数 ＋ add ＋（扶養親族がいる場合 dependentAdd）
+     * 人数は本人＋同一生計配偶者＋扶養親族（16歳未満を含む）。均等割は級地により異なる
+     */
+    nonTaxable: {
+      incomeLevy: NonTaxableRule
+      perCapita: Record<1 | 2 | 3, NonTaxableRule>
+      /** 障害者・未成年者・寡婦・ひとり親は合計所得金額がこの額以下なら非課税 */
+      specialPersonLimit: Yen
+    }
+  }
+  /** 国民健康保険料の軽減判定（翌年度。均等割・平等割を7割・5割・2割軽減） */
+  nhiReduction: {
+    base: Yen
+    /** 給与所得者等が2人以上の場合、(人数−1) × この額を加算 */
+    salaryEarnerAdd: Yen
+    halfPerMember: Yen
+    twentyPerMember: Yen
   }
   businessTax: {
     ownerDeduction: Yen
@@ -107,6 +125,12 @@ export interface FamilyRules {
   singleParent: { incomeTax: Yen; resident: Yen }
   /** 寡婦・ひとり親の本人の合計所得金額要件 */
   widowSingleParentIncomeLimit: Yen
+}
+
+export interface NonTaxableRule {
+  perPerson: Yen
+  add: Yen
+  dependentAdd: Yen
 }
 
 export type BlueDeductionType = 'e_tax_65' | 'paper_55' | 'simple_10' | 'none'

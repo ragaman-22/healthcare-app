@@ -12,6 +12,7 @@ import type {
 } from '@/lib/accounting/types'
 import { createClient } from '@/lib/supabase/server'
 import { demoDocumentLinkable, demoLinkDocument, demoUnlinkTransaction, resetDemoReceipts } from './receipts-store'
+import { resetDemoSchedule } from './schedule-store'
 import type { SessionUser } from './session'
 
 type NewEntry = Pick<JournalEntry, 'date' | 'description' | 'lines'>
@@ -47,6 +48,7 @@ function demoReplaceLinked(d: BooksData, link: { transactionId?: string; fixedAs
 export function resetDemoBooks(userId: string) {
   demoBooks.delete(userId)
   resetDemoReceipts(userId)
+  resetDemoSchedule(userId)
 }
 
 // =====================================================================

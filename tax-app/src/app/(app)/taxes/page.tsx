@@ -112,7 +112,9 @@ export default async function TaxesPage({ searchParams }: { searchParams: Promis
       </Card>
 
       <Card>
-        <SectionTitle>納付時期別の一覧</SectionTitle>
+        <SectionTitle aside={<Link href="/schedule" className="text-xs font-semibold text-brand-600 underline">納付カレンダー</Link>}>
+          納付時期別の一覧
+        </SectionTitle>
         <h3 className="mt-1 text-sm font-semibold text-slate-700">確定申告時（{s.taxYear + 1}年3月ごろ）</h3>
         <TaxLines lines={s.filingLines} />
         <h3 className="mt-3 text-sm font-semibold text-slate-700">翌年度（{s.taxYear + 1}年度）</h3>

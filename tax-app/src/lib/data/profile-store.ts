@@ -1,7 +1,7 @@
 import 'server-only'
 import { cookies } from 'next/headers'
 import { EMPTY_DETAILS, type DeductionDetails, type SalaryIncome } from '@/lib/domain/deductions'
-import { emptyProfile, type TaxYearProfile } from '@/lib/domain/profile'
+import { emptyProfile, type LocalSettings, type TaxYearProfile } from '@/lib/domain/profile'
 import { createClient } from '@/lib/supabase/server'
 import type { NhiRates } from '@/lib/tax/types'
 import { DEMO_PROFILE_COOKIE } from './demo'
@@ -69,6 +69,8 @@ export async function loadProfile(user: SessionUser): Promise<TaxYearProfile | n
     ytdRevenue: toNum(setting.ytd_revenue),
     ytdExpenses: toNum(setting.ytd_expenses),
     ytdAsOf: setting.ytd_as_of,
+    localSettings: (setting.local_settings as LocalSettings | null) ?? null,
+    reservedAmount: toNum(setting.reserved_amount),
   }
   for (const d of deductions ?? []) {
     const field = DEDUCTION_FIELDS[d.kind as DeductionKind]
@@ -275,6 +277,41 @@ export async function saveDeductionDetails(
     action: 'update',
     before,
     after: { rows, salary },
+  })
+  return {}
+}
+
+/** お住まいの自治体の設定（国保料率を含む）・取り置き額を保存する */
+export async function saveLocalSettings(
+  user: SessionUser,
+  profile: TaxYearProfile,
+  patch: Partial<Pick<TaxYearProfile, 'localSettings' | 'nhiRates' | 'reservedAmount' | 'nhiMembers' | 'nhiEnrolled'>>,
+): Promise<{ error?: string }> {
+  const next = { ...profile, ...patch }
+  if (user.isDemo) return saveProfile(user, next)
+  const supabase = await createClient()
+  const { data: before } = await supabase
+    .from('tax_year_settings')
+    .select('local_settings, nhi_rates, reserved_amount, nhi_members, nhi_enrolled')
+    .eq('user_id', user.id)
+    .eq('tax_year', profile.taxYear)
+    .maybeSingle()
+  const after = {
+    local_settings: next.localSettings,
+    nhi_rates: next.nhiRates,
+    reserved_amount: next.reservedAmount,
+    nhi_members: next.nhiMembers,
+    nhi_enrolled: next.nhiEnrolled,
+  }
+  const { error } = await supabase.from('tax_year_settings').update(after).eq('user_id', user.id).eq('tax_year', profile.taxYear)
+  if (error) return { error: error.message }
+  await supabase.from('audit_logs').insert({
+    user_id: user.id,
+    entity: 'tax_year_settings',
+    entity_id: String(profile.taxYear),
+    action: 'update',
+    before,
+    after,
   })
   return {}
 }

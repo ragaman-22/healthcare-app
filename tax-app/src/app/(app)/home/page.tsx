@@ -1,4 +1,4 @@
-import { BookOpen, Camera, ChartColumn, FileText, HeartHandshake, ReceiptJapaneseYen, ShieldAlert, SlidersHorizontal, Wallet } from 'lucide-react'
+import { BookOpen, CalendarDays, Camera, ChartColumn, FileText, HeartHandshake, ReceiptJapaneseYen, ShieldAlert, SlidersHorizontal, Wallet } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -23,7 +23,7 @@ export default async function HomePage() {
   const profile = await loadProfile(user)
   if (!profile) redirect('/onboarding')
 
-  const { summary: s, risks } = await loadDashboard(user, profile)
+  const { summary: s, risks, schedule, reserve, today } = await loadDashboard(user, profile)
   if ('error' in s) {
     return (
       <Card>
@@ -36,6 +36,7 @@ export default async function HomePage() {
   }
 
   const [, m, d] = s.asOf.split('-').map(Number)
+  const nextPayments = schedule.filter((i) => i.kind !== 'paid' && i.amount > 0 && i.dueDate >= today).slice(0, 3)
   const conf = CONFIDENCE[s.forecast.confidence]
   const filingTotal = s.filingLines.filter((l) => l.key !== 'income_tax_total')
   const nextYearTotal = s.nextYearLines.reduce((sum, l) => sum + (l.amount ?? 0), 0)
@@ -126,6 +127,42 @@ export default async function HomePage() {
         <TaxLines lines={s.nextYearLines} />
       </Card>
 
+      {/* 次の支払い・取り置き */}
+      <Card>
+        <SectionTitle aside={<Link href="/schedule" className="text-xs font-semibold text-brand-600 underline">納付カレンダー</Link>}>
+          次の支払い
+        </SectionTitle>
+        {nextPayments.length === 0 ? (
+          <p className="text-sm text-slate-500">予定されている支払いはありません。</p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {nextPayments.map((i) => (
+              <li key={i.key} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{i.label}</span>
+                  <span className="text-xs text-slate-500">
+                    {i.dueDate}・{i.period}
+                  </span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="num block font-bold">{formatYen(i.amount)}</span>
+                  <Badge tone={i.kind === 'confirmed' ? 'slate' : 'blue'}>{i.kind === 'confirmed' ? '確定' : '予測'}</Badge>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="num mt-3 flex items-center justify-between rounded-xl bg-slate-50 p-3 text-sm">
+          <span className="text-slate-600">毎月の取り置き目安</span>
+          <span className="font-bold text-brand-700">{formatYen(reserve.monthlyTarget)}</span>
+        </div>
+        {reserve.shortfall > 0 && (
+          <p className="num mt-1 text-xs text-slate-500">
+            支払い見込み {formatYen(reserve.upcomingTotal)} のうち、取り置き済み {formatYen(reserve.reserved)}（自己申告）
+          </p>
+        )}
+      </Card>
+
       {/* 税務上の注意点 */}
       {risks.length > 0 && (
         <Link href="/risks" className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
@@ -152,6 +189,7 @@ export default async function HomePage() {
         <Quick href="/receipts/new" icon={Camera} label="レシート撮影" />
         <Quick href="/books" icon={BookOpen} label="帳簿" />
         <Quick href="/taxes" icon={ChartColumn} label="税金の内訳" />
+        <Quick href="/schedule" icon={CalendarDays} label="納付カレンダー" />
         <Quick href="/deductions" icon={HeartHandshake} label="控除・給与" />
         <Quick href="/risks" icon={ShieldAlert} label="注意点" />
         <Quick href="/soon/simulate" icon={SlidersHorizontal} label="シミュレーション" />

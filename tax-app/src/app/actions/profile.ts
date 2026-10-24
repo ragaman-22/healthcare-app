@@ -20,7 +20,15 @@ export async function saveOnboarding(json: string): Promise<{ error: string }> {
   const existing = await loadProfile(user)
   const profile =
     existing && existing.taxYear === parsed.taxYear
-      ? { ...parsed, deductionDetails: existing.deductionDetails, salary: existing.salary }
+      ? {
+          ...parsed,
+          deductionDetails: existing.deductionDetails,
+          salary: existing.salary,
+          localSettings: existing.localSettings,
+          reservedAmount: existing.reservedAmount,
+          // 国保料率は自治体の設定画面で入力する
+          nhiRates: parsed.nhiRates ?? existing.nhiRates,
+        }
       : parsed
 
   const res = await saveProfile(user, profile)

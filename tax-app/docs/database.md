@@ -173,7 +173,14 @@ CHECK 制約：源泉徴収税額 < 金額、入金日 ≥ 計上日、経費に
 - `deductions` に `detail jsonb` を追加し、種類（kind）に `family`（本人・配偶者・扶養親族）、`life_insurance_paid`、`earthquake_insurance`、`medical`、`donation` を追加
 - `other_incomes`（事業所得以外の所得。現在は給与のみ）: `revenue, withholding_tax, social_insurance`、`(user_id, tax_year, kind)` で一意、RLS
 
-## 7. 第5段階以降の設計（予定）
+## 7. 第5段階のテーブル（`20261201000001_stage5_schedule.sql`）
+
+- `tax_year_settings` に `local_settings jsonb`（住民税の級地・納め方、国保の納期・世帯、所得税の納付方法）と `reserved_amount`（取り置き額・自己申告）を追加
+- `tax_notices`: 通知書で確定した金額。`tax_type`（prepayment / resident / nhi / business）、`fiscal_year`、`total`、`installments jsonb`（各期の納期限と金額）。`(user_id, tax_type, fiscal_year)` で一意
+- `tax_payment_records`: 納付済みの記録。`payment_key`（`税目:年度:期`、形式を CHECK 制約で検証）、`paid_on`、`amount`。`(user_id, payment_key)` で一意
+- いずれも RLS で本人のみ
+
+## 8. 第6段階以降の設計（予定）
 
 ### tax_returns（申告書）
 - `id, user_id, tax_year, form_type（blue_return/white_statement/income_tax_return）, status（draft/checked/exported）, data jsonb, rule_version, calculation_id, pdf_path, created_at`

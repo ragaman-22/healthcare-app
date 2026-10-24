@@ -25,6 +25,23 @@ export const RESIDENT_TAX_COMMON: TaxRuleSet['residentTax'] = {
   ],
   basicDeductionDifference: 50_000,
   lifeInsuranceDeductionCap: 70_000,
+  nonTaxable: {
+    incomeLevy: { perPerson: 350_000, add: 100_000, dependentAdd: 320_000 },
+    perCapita: {
+      1: { perPerson: 350_000, add: 100_000, dependentAdd: 210_000 },
+      2: { perPerson: 315_000, add: 100_000, dependentAdd: 189_000 },
+      3: { perPerson: 280_000, add: 100_000, dependentAdd: 168_000 },
+    },
+    specialPersonLimit: 1_350_000,
+  },
+}
+
+/** 国保の軽減判定（令和8年度の基準。翌年度の基準は未公表のため同額で試算） */
+export const NHI_REDUCTION_R8: TaxRuleSet['nhiReduction'] = {
+  base: 430_000,
+  salaryEarnerAdd: 100_000,
+  halfPerMember: 310_000,
+  twentyPerMember: 570_000,
 }
 
 /** 給与所得控除の 360万円超の区分（令和2年分以降共通） */
@@ -91,9 +108,10 @@ export const COMMON_NOTES: TaxRuleSet['notes'] = [
   { item: '住民税 所得割10%（市町村6%・道府県4%）', status: 'verified', source: '総務省 個人住民税（標準税率）' },
   { item: '住民税 均等割（標準: 市町村3,000円・道府県1,000円）・森林環境税1,000円', status: 'unverified', source: '標準税率。自治体の超過課税により異なるため、お住まいの自治体で確認が必要' },
   { item: '住民税 基礎控除43万円・調整控除', status: 'secondary_source', source: '総務省資料・地方税法。対象年度の改正有無を確認する必要あり' },
-  { item: '住民税 非課税限度額', status: 'not_implemented', source: '自治体の級地区分により異なるため未対応（課税として試算）' },
-  { item: '国民健康保険料', status: 'unverified', source: '自治体ごとに料率・限度額が異なる。利用者が自治体の料率を入力する前提' },
-  { item: '国民健康保険料の軽減（7割・5割・2割）', status: 'not_implemented', source: '未対応' },
+  { item: '住民税 非課税限度額（所得割: 35万円×人数＋10万円＋扶養加算32万円、均等割: 級地別）', status: 'secondary_source', source: '地方税法・各自治体の案内（単身・1級地で合計所得45万円以下）。級地は利用者が選択' },
+  { item: '国民健康保険料', status: 'unverified', source: '自治体ごとに料率・限度額・納期が異なる。利用者が自治体の料率を入力する前提' },
+  { item: '国民健康保険料の軽減（7割・5割・2割）', status: 'secondary_source', source: '令和8年度の基準（43万円、5割31万円・2割57万円×加入者数）で試算。翌年度の基準は未公表。世帯の他の加入者の所得は利用者の入力による' },
+  { item: '納付時期（住民税4回・国保・事業税8月/11月・予定納税7月/11月）', status: 'unverified', source: '一般的な納期で表示。自治体により異なるため、通知書の内容を入力すると置き換わる。祝日は考慮せず土日のみ翌営業日に調整' },
   { item: '個人事業税（事業主控除290万円・税率3〜5%）', status: 'secondary_source', source: '都道府県税の案内。法定業種の該当判定は都道府県が行う' },
   { item: '消費税（一般課税・簡易課税）', status: 'not_implemented', source: '未対応' },
   { item: '配偶者控除・扶養控除・障害者控除・寡婦控除・ひとり親控除の控除額', status: 'verified', source: '国税庁 タックスアンサー No.1191・1180・1160・1170・1171（控除額は平成30年分・令和2年分以降で変更なし）' },

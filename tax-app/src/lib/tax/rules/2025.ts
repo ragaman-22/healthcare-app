@@ -1,5 +1,5 @@
 import type { TaxRuleSet } from '../types'
-import { COMMON_NOTES, familyRules, INCOME_TAX_BRACKETS, RESIDENT_TAX_COMMON, SALARY_UPPER_BRACKETS } from './common'
+import { COMMON_NOTES, familyRules, INCOME_TAX_BRACKETS, NHI_REDUCTION_R8, RESIDENT_TAX_COMMON, SALARY_UPPER_BRACKETS } from './common'
 
 /** 令和7年分（2025年分）の所得 → 令和8年度の住民税・国保 */
 export const RULES_2025: TaxRuleSet = {
@@ -30,6 +30,7 @@ export const RULES_2025: TaxRuleSet = {
   },
   family: familyRules(580_000),
   residentTax: RESIDENT_TAX_COMMON,
+  nhiReduction: NHI_REDUCTION_R8,
   businessTax: { ownerDeduction: 2_900_000 },
   consumptionTax: { twoTenthsSpecialAvailable: true },
   notes: [

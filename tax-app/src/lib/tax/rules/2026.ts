@@ -1,5 +1,5 @@
 import type { TaxRuleSet } from '../types'
-import { COMMON_NOTES, familyRules, INCOME_TAX_BRACKETS, RESIDENT_TAX_COMMON, SALARY_UPPER_BRACKETS } from './common'
+import { COMMON_NOTES, familyRules, INCOME_TAX_BRACKETS, NHI_REDUCTION_R8, RESIDENT_TAX_COMMON, SALARY_UPPER_BRACKETS } from './common'
 
 /** 令和8年分（2026年分）の所得 → 令和9年度の住民税・国保 */
 export const RULES_2026: TaxRuleSet = {
@@ -30,6 +30,7 @@ export const RULES_2026: TaxRuleSet = {
   },
   family: familyRules(620_000),
   residentTax: RESIDENT_TAX_COMMON,
+  nhiReduction: NHI_REDUCTION_R8,
   businessTax: { ownerDeduction: 2_900_000 },
   // 2割特例は令和8年9月30日を含む課税期間まで（個人事業者は令和8年分まで）
   consumptionTax: { twoTenthsSpecialAvailable: true },

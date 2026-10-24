@@ -1,5 +1,6 @@
 import type { BookActuals } from '@/lib/accounting/summary'
-import type { TaxYearProfile } from '@/lib/domain/profile'
+import type { TaxNotice } from '@/lib/schedule/types'
+import { DEFAULT_LOCAL_SETTINGS, type TaxYearProfile } from '@/lib/domain/profile'
 import { calcBusinessTax } from './business-tax'
 import { calcConsumptionTax } from './consumption-tax'
 import { forecastYearEnd, type ForecastResult } from './forecast'
@@ -71,6 +72,8 @@ export function buildDashboard(
   profile: TaxYearProfile,
   today: string,
   actuals?: BookActuals,
+  /** 通知書で確定した翌年度の金額（住民税・国保・事業税） */
+  notices: TaxNotice[] = [],
 ): DashboardSummary | { error: string } {
   const rules = getRules(profile.taxYear)
   if (!rules) return { error: `${profile.taxYear}年分の税務ルールは未対応です` }
@@ -116,10 +119,12 @@ export function buildDashboard(
     estimatedTaxPrepaid,
   })
 
+  const local = { ...DEFAULT_LOCAL_SETTINGS, ...profile.localSettings }
   const resident = calcResidentTax(rules, {
     totalIncome: incomeTax.totalIncome,
     deductions: incomeTax.deductions,
     incomeTaxMarginalRate: incomeTax.marginalRate,
+    grade: local.residentGrade,
   })
 
   const fiscalYear = profile.taxYear + 1
@@ -131,6 +136,11 @@ export function buildDashboard(
         residentBasicDeduction: resident.basicDeduction,
         careApplicable: isCareApplicable(profile.birthDate, fiscalYear),
         members: profile.nhiMembers ?? 1,
+        reduction: {
+          rules: rules.nhiReduction,
+          otherMembersIncome: local.nhiOtherMembersIncome,
+          salaryEarners: local.nhiSalaryEarners + (salary ? 1 : 0),
+        },
       })
     : null
 
@@ -181,7 +191,11 @@ export function buildDashboard(
       period: `${fiscalYear}年度`,
       dueHint: `${fiscalYear}年6月〜${fiscalYear + 1}年1月（通常4回）`,
       kind: 'forecast',
-      note: '均等割は標準税率で計算',
+      note: resident.perCapitaExempt
+        ? '非課税の見込み（非課税限度額以下）'
+        : resident.incomeLevyExempt
+          ? '所得割は非課税、均等割のみの見込み'
+          : '均等割は標準税率で計算',
     },
   ]
   if (nhi) {
@@ -193,7 +207,12 @@ export function buildDashboard(
       period: `${fiscalYear}年度`,
       dueHint: `${fiscalYear}年6月ごろから分割（自治体により異なる）`,
       kind: 'forecast',
-      note: nhiRates.isSample ? '参考料率での試算。自治体の料率を入力してください' : nhiRates.label,
+      note: [
+        nhiRates.isSample ? '参考料率での試算。自治体の料率を入力してください' : nhiRates.label,
+        nhi.reductionRate > 0 ? `均等割・平等割の${nhi.reductionRate * 10}割軽減の見込み` : '',
+      ]
+        .filter(Boolean)
+        .join('・'),
     })
   }
   nextYearLines.push({
@@ -206,6 +225,13 @@ export function buildDashboard(
     kind: 'forecast',
     note: businessTax === null ? '業種（税率）が未入力のため計算していません' : '事業主控除290万円を差し引いて計算',
   })
+
+  // 通知書の金額が入力されていれば、予測を確定額に置き換える
+  const noticeKey: Record<string, TaxNotice['taxType']> = { resident_tax: 'resident', nhi: 'nhi', business_tax: 'business' }
+  for (const line of nextYearLines) {
+    const n = notices.find((x) => x.taxType === noticeKey[line.key] && x.fiscalYear === fiscalYear)
+    if (n) Object.assign(line, { amount: n.total, kind: 'confirmed', note: '通知書の金額（確定）' })
+  }
 
   const alreadyPaidIncomeTax = withholdingTax + estimatedTaxPrepaid
   // 申告時の還付はプラスに働く（dueAtFiling がマイナス）
