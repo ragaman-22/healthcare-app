@@ -1,4 +1,4 @@
-import { BookOpen, Camera, ChartColumn, FileText, ReceiptJapaneseYen, ShieldAlert, SlidersHorizontal, Wallet } from 'lucide-react'
+import { BookOpen, Camera, ChartColumn, FileText, HeartHandshake, ReceiptJapaneseYen, ShieldAlert, SlidersHorizontal, Wallet } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -152,6 +152,7 @@ export default async function HomePage() {
         <Quick href="/receipts/new" icon={Camera} label="レシート撮影" />
         <Quick href="/books" icon={BookOpen} label="帳簿" />
         <Quick href="/taxes" icon={ChartColumn} label="税金の内訳" />
+        <Quick href="/deductions" icon={HeartHandshake} label="控除・給与" />
         <Quick href="/risks" icon={ShieldAlert} label="注意点" />
         <Quick href="/soon/simulate" icon={SlidersHorizontal} label="シミュレーション" />
         <Quick href="/soon/return" icon={FileText} label="確定申告書" />

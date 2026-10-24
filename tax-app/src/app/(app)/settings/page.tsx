@@ -10,6 +10,7 @@ export const metadata: Metadata = { title: 'メニュー｜おかねと税金ノ
 const LINKS = [
   { href: '/onboarding', label: '申告情報・初期設定を変更' },
   { href: '/taxes', label: '税金の内訳と納付時期' },
+  { href: '/deductions', label: '控除・給与の入力' },
   { href: '/books', label: '帳簿（損益計算書・試算表・総勘定元帳）' },
   { href: '/journal', label: '仕訳帳' },
   { href: '/assets', label: '固定資産・減価償却' },

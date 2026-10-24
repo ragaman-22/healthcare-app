@@ -1,4 +1,5 @@
 import type { ConsumptionTaxStatus } from '@/lib/tax/consumption-tax'
+import type { DeductionDetails, SalaryIncome } from './deductions'
 import type { BlueDeductionType, NhiRates } from '@/lib/tax/types'
 
 export type YesNoUnknown = 'yes' | 'no' | 'unknown'
@@ -46,6 +47,10 @@ export interface TaxYearProfile {
   ytdRevenue: number | null
   ytdExpenses: number | null
   ytdAsOf: string | null
+  /** 控除の詳細（控除の入力画面）。null は未入力 */
+  deductionDetails: DeductionDetails | null
+  /** 給与収入。null は未入力 */
+  salary: SalaryIncome | null
 }
 
 export function emptyProfile(taxYear: number): TaxYearProfile {
@@ -77,5 +82,7 @@ export function emptyProfile(taxYear: number): TaxYearProfile {
     ytdRevenue: null,
     ytdExpenses: null,
     ytdAsOf: null,
+    deductionDetails: null,
+    salary: null,
   }
 }

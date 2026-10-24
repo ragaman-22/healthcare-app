@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { parseProfile } from '@/lib/domain/parse-profile'
 import { loadDashboard } from '@/lib/data/dashboard'
-import { saveCalculation, saveProfile } from '@/lib/data/profile-store'
+import { loadProfile, saveCalculation, saveProfile } from '@/lib/data/profile-store'
 import { requireUser } from '@/lib/data/session'
 
 export async function saveOnboarding(json: string): Promise<{ error: string }> {
@@ -14,8 +14,14 @@ export async function saveOnboarding(json: string): Promise<{ error: string }> {
   } catch {
     return { error: '入力内容を読み取れませんでした' }
   }
-  const profile = parseProfile(input)
-  if ('error' in profile) return profile
+  const parsed = parseProfile(input)
+  if ('error' in parsed) return parsed
+  // 控除の詳細・給与収入は別画面で入力するため、同じ年度であれば引き継ぐ
+  const existing = await loadProfile(user)
+  const profile =
+    existing && existing.taxYear === parsed.taxYear
+      ? { ...parsed, deductionDetails: existing.deductionDetails, salary: existing.salary }
+      : parsed
 
   const res = await saveProfile(user, profile)
   if (res.error) return { error: `保存に失敗しました: ${res.error}` }

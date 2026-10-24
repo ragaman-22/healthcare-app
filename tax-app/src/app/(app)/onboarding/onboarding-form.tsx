@@ -173,7 +173,7 @@ const STEPS: Step[] = [
   },
   {
     title: '家族と健康保険',
-    lead: '配偶者・扶養家族の控除は現在自動計算していません（控除額がわかる場合は次の画面で入力できます）。',
+    lead: '配偶者・扶養家族の生年月日や所得は、初期設定の後に「控除・給与の入力」で入力すると控除額を自動で計算します。',
     render: (s, set) => (
       <>
         <Field label="配偶者はいますか">
@@ -222,8 +222,8 @@ const STEPS: Step[] = [
           <YenInput value={s.smallBusinessMutualAid} onChange={(v) => set('smallBusinessMutualAid', v)} />
         </Field>
         <Field
-          label="その他の所得控除の合計（配偶者・扶養・医療費など）"
-          hint="所得税の控除額を入力します。住民税も同額として概算するため、実際とずれる場合があります。"
+          label="その他の所得控除の合計（上記・控除の入力画面にないもの）"
+          hint="配偶者・扶養・医療費・ふるさと納税などは「控除・給与の入力」で計算できます。ここには、それ以外の控除額を入力します。"
         >
           <YenInput value={s.otherDeductions} onChange={(v) => set('otherDeductions', v)} />
         </Field>

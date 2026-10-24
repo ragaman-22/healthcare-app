@@ -1,4 +1,7 @@
-import { floorTo, floorYen, lookupAmount, multiplyRate } from './rounding'
+import type { DeductionDetails } from '@/lib/domain/deductions'
+import { calcDeductions, type DeductionResult } from './deductions'
+import { floorTo, floorYen, multiplyRate } from './rounding'
+import { salaryIncome } from './salary'
 import type { BlueDeductionType, TaxRuleSet, Yen } from './types'
 
 export interface IncomeTaxInput {
@@ -13,8 +16,12 @@ export interface IncomeTaxInput {
   smallBusinessMutualAid: Yen
   /** 生命保険料控除（所得税の控除額） */
   lifeInsuranceDeduction: Yen
-  /** その他の所得控除（配偶者・扶養・医療費など。控除額を直接入力） */
+  /** その他の所得控除（控除額を直接入力したもの） */
   otherDeductions: Yen
+  /** 給与収入（源泉徴収票の支払金額） */
+  salaryRevenue?: Yen
+  /** 人的控除・保険料・医療費・寄附金などの詳細 */
+  details?: DeductionDetails | null
   /** 源泉徴収税額（所得税及び復興特別所得税） */
   withholdingTax: Yen
   /** 予定納税額（第1期・第2期の合計） */
@@ -25,9 +32,11 @@ export interface IncomeTaxResult {
   /** 青色申告特別控除前の所得（収入 − 経費） */
   profit: Yen
   blueDeductionApplied: Yen
-  /** 事業所得 */
+  /** 事業所得（赤字の場合はマイナス） */
   businessIncome: Yen
-  /** 合計所得金額（現在は事業所得のみ） */
+  /** 給与所得 */
+  salaryIncome: Yen
+  /** 合計所得金額（事業所得と給与所得を損益通算。マイナスは0） */
   totalIncome: Yen
   basicDeduction: Yen
   totalDeductions: Yen
@@ -43,6 +52,8 @@ export interface IncomeTaxResult {
   /** 第3期分（申告時に納付・還付される額。予定納税控除後） */
   dueAtFiling: Yen
   marginalRate: number
+  /** 所得控除の内訳（所得税・住民税） */
+  deductions: DeductionResult
 }
 
 export function blueDeductionAmount(rules: TaxRuleSet, type: BlueDeductionType, profit: Yen): Yen {
@@ -63,17 +74,22 @@ export function calcIncomeTaxOnTaxable(rules: TaxRuleSet, taxableIncome: Yen) {
 export function calcIncomeTax(rules: TaxRuleSet, input: IncomeTaxInput): IncomeTaxResult {
   const profit = input.revenue - input.expenses
   const blueDeductionApplied = blueDeductionAmount(rules, input.blueDeduction, profit)
-  // 赤字の場合は 0 として扱う（損失の繰越・損益通算は未対応）
-  const businessIncome = Math.max(0, profit - blueDeductionApplied)
-  const totalIncome = businessIncome
+  const businessIncome = profit - blueDeductionApplied
+  const salary = salaryIncome(rules, input.salaryRevenue ?? 0)
+  // 事業所得の赤字は給与所得と損益通算する。残った損失の繰越は未対応のため0とする
+  const totalIncome = Math.max(0, businessIncome + salary)
 
-  const basicDeduction = lookupAmount(rules.incomeTax.basicDeduction, totalIncome)
-  const totalDeductions =
-    input.socialInsurance +
-    input.smallBusinessMutualAid +
-    input.lifeInsuranceDeduction +
-    input.otherDeductions +
-    basicDeduction
+  const deductions = calcDeductions(rules, {
+    year: rules.year,
+    totalIncome,
+    socialInsurance: input.socialInsurance,
+    smallBusinessMutualAid: input.smallBusinessMutualAid,
+    lifeInsuranceDeduction: input.lifeInsuranceDeduction,
+    otherDeductions: input.otherDeductions,
+    details: input.details ?? null,
+  })
+  const basicDeduction = deductions.lines.find((l) => l.key === 'basic')?.incomeTax ?? 0
+  const totalDeductions = deductions.incomeTaxTotal
 
   const taxableIncome = floorTo(Math.max(0, totalIncome - totalDeductions), 1_000)
   const { tax: baseIncomeTax, marginalRate } = calcIncomeTaxOnTaxable(rules, taxableIncome)
@@ -89,6 +105,7 @@ export function calcIncomeTax(rules: TaxRuleSet, input: IncomeTaxInput): IncomeT
     profit,
     blueDeductionApplied,
     businessIncome,
+    salaryIncome: salary,
     totalIncome,
     basicDeduction,
     totalDeductions,
@@ -99,5 +116,6 @@ export function calcIncomeTax(rules: TaxRuleSet, input: IncomeTaxInput): IncomeT
     filingTax,
     dueAtFiling,
     marginalRate,
+    deductions,
   }
 }

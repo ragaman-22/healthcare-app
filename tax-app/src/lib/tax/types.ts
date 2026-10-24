@@ -42,6 +42,18 @@ export interface TaxRuleSet {
     basicDeduction: AmountBracket[]
     blueDeduction: { e_tax_65: Yen; paper_55: Yen; simple_10: Yen }
   }
+  /** 給与所得控除（所得税・住民税で共通の額を使用） */
+  salary: {
+    /** 最低保障額 */
+    minDeduction: Yen
+    /** 最低保障額が適用される給与収入の上限 */
+    minUpTo: Yen
+    /** 最低保障額を超える区分: 収入 × rate + add（upTo 以下に適用） */
+    brackets: { upTo: Yen | null; rate: number; add: Yen }[]
+    /** 年末調整等のための表（所得税法別表第五）により4,000円単位で計算する収入の上限（未満） */
+    tableUpTo: Yen
+  }
+  family: FamilyRules
   residentTax: {
     /** 翌年度の住民税（所得割）の税率 */
     municipalRate: number
@@ -64,6 +76,37 @@ export interface TaxRuleSet {
     twoTenthsSpecialAvailable: boolean
   }
   notes: RuleNote[]
+}
+
+/** 人的控除（配偶者・扶養・障害者・寡婦・ひとり親）のルール */
+export interface FamilyRules {
+  /** 同一生計配偶者・扶養親族の合計所得金額要件 */
+  dependentIncomeLimit: Yen
+  /** 配偶者特別控除の対象となる配偶者の合計所得金額の上限 */
+  spouseSpecialUpper: Yen
+  /** 本人の合計所得金額の区分（配偶者控除・配偶者特別控除） */
+  taxpayerBrackets: [Yen, Yen, Yen]
+  spouse: {
+    incomeTax: { general: [Yen, Yen, Yen]; elderly: [Yen, Yen, Yen] }
+    resident: { general: [Yen, Yen, Yen]; elderly: [Yen, Yen, Yen] }
+  }
+  /** 配偶者特別控除: 配偶者の合計所得金額 upTo 以下 → 本人の区分ごとの控除額 */
+  spouseSpecial: {
+    incomeTax: { upTo: Yen; amounts: [Yen, Yen, Yen] }[]
+    resident: { upTo: Yen; amounts: [Yen, Yen, Yen] }[]
+  }
+  dependent: {
+    incomeTax: { general: Yen; specific: Yen; elderly: Yen; elderlyParent: Yen }
+    resident: { general: Yen; specific: Yen; elderly: Yen; elderlyParent: Yen }
+  }
+  disability: {
+    incomeTax: { general: Yen; special: Yen; specialCohabiting: Yen }
+    resident: { general: Yen; special: Yen; specialCohabiting: Yen }
+  }
+  widow: { incomeTax: Yen; resident: Yen }
+  singleParent: { incomeTax: Yen; resident: Yen }
+  /** 寡婦・ひとり親の本人の合計所得金額要件 */
+  widowSingleParentIncomeLimit: Yen
 }
 
 export type BlueDeductionType = 'e_tax_65' | 'paper_55' | 'simple_10' | 'none'

@@ -1,5 +1,6 @@
 import 'server-only'
 import { cookies } from 'next/headers'
+import { EMPTY_DETAILS, type DeductionDetails, type SalaryIncome } from '@/lib/domain/deductions'
 import { emptyProfile, type TaxYearProfile } from '@/lib/domain/profile'
 import { createClient } from '@/lib/supabase/server'
 import type { NhiRates } from '@/lib/tax/types'
@@ -38,9 +39,10 @@ export async function loadProfile(user: SessionUser): Promise<TaxYearProfile | n
     .maybeSingle()
   if (!setting) return null
 
-  const [{ data: up }, { data: deductions }] = await Promise.all([
+  const [{ data: up }, { data: deductions }, { data: incomes }] = await Promise.all([
     supabase.from('user_profiles').select('*').eq('id', user.id).maybeSingle(),
-    supabase.from('deductions').select('kind, amount').eq('user_id', user.id).eq('tax_year', setting.tax_year),
+    supabase.from('deductions').select('kind, amount, detail').eq('user_id', user.id).eq('tax_year', setting.tax_year),
+    supabase.from('other_incomes').select('*').eq('user_id', user.id).eq('tax_year', setting.tax_year),
   ])
 
   const profile: TaxYearProfile = {
@@ -72,8 +74,35 @@ export async function loadProfile(user: SessionUser): Promise<TaxYearProfile | n
     const field = DEDUCTION_FIELDS[d.kind as DeductionKind]
     if (field) (profile as unknown as Record<string, unknown>)[field] = Number(d.amount)
   }
+  profile.deductionDetails = detailsFromRows(deductions ?? [])
+  const salary = (incomes ?? []).find((i) => i.kind === 'salary')
+  if (salary) {
+    profile.salary = {
+      revenue: Number(salary.revenue),
+      withholdingTax: Number(salary.withholding_tax),
+      socialInsurance: Number(salary.social_insurance),
+    }
+  }
   return profile
 }
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function detailsFromRows(rows: { kind: string; amount: unknown; detail: any }[]): DeductionDetails | null {
+  const by = new Map(rows.map((r) => [r.kind, r]))
+  const keys = ['family', 'life_insurance_paid', 'earthquake_insurance', 'medical', 'donation']
+  if (!keys.some((k) => by.has(k))) return null
+  const family = by.get('family')?.detail ?? {}
+  return {
+    self: family.self ?? EMPTY_DETAILS.self,
+    spouse: family.spouse ?? null,
+    dependents: family.dependents ?? [],
+    lifeInsurance: by.get('life_insurance_paid')?.detail ?? null,
+    earthquakeInsurance: by.has('earthquake_insurance') ? Number(by.get('earthquake_insurance')!.amount) : null,
+    medical: by.get('medical')?.detail ?? null,
+    donations: by.get('donation')?.detail ?? null,
+  }
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 function toNum(v: unknown): number | null {
   return v === null || v === undefined ? null : Number(v)
@@ -188,4 +217,64 @@ export async function saveCalculation(
     inputs,
     result,
   })
+}
+
+/** 控除の詳細と給与収入を保存する（控除の入力画面） */
+export async function saveDeductionDetails(
+  user: SessionUser,
+  profile: TaxYearProfile,
+  details: DeductionDetails,
+  salary: SalaryIncome | null,
+): Promise<{ error?: string }> {
+  const next: TaxYearProfile = {
+    ...profile,
+    deductionDetails: details,
+    salary,
+    hasSalaryIncome: salary ? 'yes' : profile.hasSalaryIncome === 'yes' ? 'no' : profile.hasSalaryIncome,
+    hasSpouse: details.spouse ? 'yes' : profile.hasSpouse,
+    dependentsCount: details.dependents.length,
+  }
+  if (user.isDemo) return saveProfile(user, next)
+
+  const supabase = await createClient()
+  const year = profile.taxYear
+  const rows: { kind: string; amount: number; detail: unknown }[] = [
+    { kind: 'family', amount: 0, detail: { self: details.self, spouse: details.spouse, dependents: details.dependents } },
+  ]
+  if (details.lifeInsurance) rows.push({ kind: 'life_insurance_paid', amount: 0, detail: details.lifeInsurance })
+  if (details.earthquakeInsurance !== null) rows.push({ kind: 'earthquake_insurance', amount: details.earthquakeInsurance, detail: null })
+  if (details.medical) rows.push({ kind: 'medical', amount: 0, detail: details.medical })
+  if (details.donations) rows.push({ kind: 'donation', amount: 0, detail: details.donations })
+
+  const { data: before } = await supabase.from('deductions').select('*').eq('user_id', user.id).eq('tax_year', year)
+  const detailKinds = ['family', 'life_insurance_paid', 'earthquake_insurance', 'medical', 'donation']
+  const del = await supabase.from('deductions').delete().eq('user_id', user.id).eq('tax_year', year).in('kind', detailKinds)
+  if (del.error) return { error: del.error.message }
+  const ins = await supabase.from('deductions').insert(rows.map((r) => ({ ...r, user_id: user.id, tax_year: year })))
+  if (ins.error) return { error: ins.error.message }
+
+  const inc = salary
+    ? await supabase.from('other_incomes').upsert(
+        { user_id: user.id, tax_year: year, kind: 'salary', revenue: salary.revenue, withholding_tax: salary.withholdingTax, social_insurance: salary.socialInsurance },
+        { onConflict: 'user_id,tax_year,kind' },
+      )
+    : await supabase.from('other_incomes').delete().eq('user_id', user.id).eq('tax_year', year).eq('kind', 'salary')
+  if (inc.error) return { error: inc.error.message }
+
+  const upd = await supabase
+    .from('tax_year_settings')
+    .update({ has_salary_income: next.hasSalaryIncome, has_spouse: next.hasSpouse, dependents_count: next.dependentsCount })
+    .eq('user_id', user.id)
+    .eq('tax_year', year)
+  if (upd.error) return { error: upd.error.message }
+
+  await supabase.from('audit_logs').insert({
+    user_id: user.id,
+    entity: 'deductions',
+    entity_id: String(year),
+    action: 'update',
+    before,
+    after: { rows, salary },
+  })
+  return {}
 }

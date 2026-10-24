@@ -20,7 +20,7 @@ Supabase PostgreSQL。**金額はすべて円単位の整数（`bigint`）**。�
 | `journal_entries` | 仕訳ヘッダー | ✅ 第2段階 |
 | `journal_lines` | 仕訳明細 | ✅ 第2段階 |
 | `fixed_assets` | 固定資産 | ✅ 第2段階 |
-| `tax_rule_versions` | 年度別税務ルールのメタ情報 | ⏳ 第4段階 |
+| `other_incomes` | 事業所得以外の所得（給与） | ✅ 第4段階 |
 | `documents` | 証憑画像 | ✅ 第3段階 |
 | `ocr_results` | OCR 読み取り結果（候補） | ✅ 第3段階 |
 | `tax_returns` | 申告書データ | ⏳ 第7段階 |
@@ -168,7 +168,12 @@ CHECK 制約：源泉徴収税額 < 金額、入金日 ≥ 計上日、経費に
 - OCR 結果は select / insert のみ
 - 証憑・OCR 結果・取引の相互参照は同じ利用者のものに限る（トリガー）
 
-## 6. 第4段階以降の設計（予定）
+## 6. 第4段階のテーブル（`20261120000001_stage4_deductions.sql`）
+
+- `deductions` に `detail jsonb` を追加し、種類（kind）に `family`（本人・配偶者・扶養親族）、`life_insurance_paid`、`earthquake_insurance`、`medical`、`donation` を追加
+- `other_incomes`（事業所得以外の所得。現在は給与のみ）: `revenue, withholding_tax, social_insurance`、`(user_id, tax_year, kind)` で一意、RLS
+
+## 7. 第5段階以降の設計（予定）
 
 ### tax_returns（申告書）
 - `id, user_id, tax_year, form_type（blue_return/white_statement/income_tax_return）, status（draft/checked/exported）, data jsonb, rule_version, calculation_id, pdf_path, created_at`

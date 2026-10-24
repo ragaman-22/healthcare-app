@@ -5,7 +5,7 @@ import { calcConsumptionTax } from './consumption-tax'
 import { forecastYearEnd, type ForecastResult } from './forecast'
 import { calcIncomeTax, type IncomeTaxResult } from './income-tax'
 import { calcNhi, isCareApplicable, SAMPLE_NHI_RATES } from './nhi'
-import { calcResidentTax } from './resident-tax'
+import { calcResidentTax, type ResidentTaxResult } from './resident-tax'
 import { getRules } from './rules'
 import type { RuleNote, Yen } from './types'
 
@@ -46,6 +46,7 @@ export interface DashboardSummary {
   depreciation: Yen
   forecast: ForecastResult & { profit: Yen }
   incomeTax: IncomeTaxResult
+  resident: ResidentTaxResult
   /** 申告時に精算する所得税等 */
   filingLines: TaxLine[]
   /** 翌年度に支払う税金・保険料 */
@@ -99,24 +100,26 @@ export function buildDashboard(
   // 源泉徴収税額は、初期設定の入力（年間見込み）を優先し、なければ帳簿の入金記録の合計を使う
   const withholdingTax = profile.withholdingTax ?? (useBooks ? actuals.withholdingTax : 0)
   const estimatedTaxPrepaid = n(profile.estimatedTaxPrepaid)
+  const salary = profile.salary
   const incomeTax = calcIncomeTax(rules, {
     revenue: forecast.projectedRevenue,
     expenses: forecast.projectedExpenses,
     blueDeduction: blueType,
-    socialInsurance: n(profile.socialInsurancePaid),
+    salaryRevenue: salary?.revenue ?? 0,
+    socialInsurance: n(profile.socialInsurancePaid) + (salary?.socialInsurance ?? 0),
     smallBusinessMutualAid: n(profile.smallBusinessMutualAid),
     lifeInsuranceDeduction: n(profile.lifeInsuranceDeduction),
     otherDeductions: n(profile.otherDeductions),
-    withholdingTax,
+    details: profile.deductionDetails,
+    // 給与から源泉徴収された税額も申告時に精算する
+    withholdingTax: withholdingTax + (salary?.withholdingTax ?? 0),
     estimatedTaxPrepaid,
   })
 
   const resident = calcResidentTax(rules, {
     totalIncome: incomeTax.totalIncome,
-    socialInsurance: n(profile.socialInsurancePaid),
-    smallBusinessMutualAid: n(profile.smallBusinessMutualAid),
-    lifeInsuranceDeductionIncomeTax: n(profile.lifeInsuranceDeduction),
-    otherDeductions: n(profile.otherDeductions),
+    deductions: incomeTax.deductions,
+    incomeTaxMarginalRate: incomeTax.marginalRate,
   })
 
   const fiscalYear = profile.taxYear + 1
@@ -255,19 +258,43 @@ export function buildDashboard(
       detail: '報酬から源泉徴収されている場合、申告時の追加納付額は表示より少なくなります。',
     })
   }
-  if (profile.hasSalaryIncome === 'yes' || profile.hasOtherIncome === 'yes') {
+  if (profile.hasSalaryIncome === 'yes' && !salary) {
     warnings.push({
       level: 'critical',
-      title: '事業所得以外の所得は未対応です',
-      detail: '給与所得などは計算に含まれていません。合算すると税率・税額が変わるため、表示額は参考値です。',
+      title: '給与収入が未入力です',
+      detail: '給与があると税率・税額が変わります。「控除・給与の入力」で源泉徴収票の金額を入力してください。',
     })
   }
-  if (profile.hasSpouse === 'yes' || n(profile.dependentsCount) > 0) {
+  if (salary && salary.revenue > 8_500_000) {
     warnings.push({
       level: 'warning',
-      title: '配偶者控除・扶養控除は自動計算していません',
-      detail: '該当する控除額がわかる場合は「その他の所得控除」に入力してください（住民税の控除額は所得税と異なります）。',
+      title: '所得金額調整控除は未対応です',
+      detail: '給与収入が850万円を超え、23歳未満の扶養親族や特別障害者がいる場合などは、税額が表示より少なくなることがあります。',
     })
+  }
+  if (profile.hasOtherIncome === 'yes') {
+    warnings.push({
+      level: 'critical',
+      title: '給与以外の所得（年金・不動産・株式など）は未対応です',
+      detail: '計算に含まれていません。合算すると税率・税額が変わるため、表示額は参考値です。',
+    })
+  }
+  if ((profile.hasSpouse === 'yes' || n(profile.dependentsCount) > 0) && !profile.deductionDetails) {
+    warnings.push({
+      level: 'warning',
+      title: '配偶者・扶養親族の情報が未入力です',
+      detail: '「控除・給与の入力」で配偶者・扶養親族の生年月日と所得を入力すると、配偶者控除・扶養控除を自動で計算します。',
+    })
+  }
+  if (resident.donationCapped) {
+    warnings.push({
+      level: 'warning',
+      title: 'ふるさと納税が控除の上限を超えている可能性があります',
+      detail: '住民税の特例分が上限（所得割の20%）に達しているため、自己負担が2,000円を超える見込みです。所得の見込みが変わると上限も変わります。',
+    })
+  }
+  for (const note of incomeTax.deductions.notes) {
+    warnings.push({ level: 'warning', title: '控除の計算で確認が必要です', detail: note })
   }
   if (nhiApplicable && nhiRates.isSample) {
     warnings.push({
@@ -312,6 +339,7 @@ export function buildDashboard(
     nextYearIncomplete,
     warnings,
     ruleNotes: rules.notes,
+    resident,
     inputs: { profile, today, blueType, nhiRates: nhiRates.label, actuals: useBooks ? actuals : null },
   }
 }

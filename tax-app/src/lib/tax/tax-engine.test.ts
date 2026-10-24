@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { EMPTY_DETAILS, type DeductionDetails } from '@/lib/domain/deductions'
 import { emptyProfile } from '@/lib/domain/profile'
 import { calcBusinessTax } from './business-tax'
 import { calcConsumptionTax } from './consumption-tax'
+import { calcDeductions, lifeInsuranceIncomeTax, lifeInsuranceResident } from './deductions'
 import { buildDashboard } from './dashboard'
 import { forecastYearEnd } from './forecast'
 import { calcIncomeTax, calcIncomeTaxOnTaxable, type IncomeTaxInput } from './income-tax'
@@ -9,6 +11,7 @@ import { calcNhi, isCareApplicable, SAMPLE_NHI_RATES } from './nhi'
 import { calcResidentTax } from './resident-tax'
 import { RULES_2025 } from './rules/2025'
 import { RULES_2026 } from './rules/2026'
+import { salaryIncome } from './salary'
 
 const base: IncomeTaxInput = {
   revenue: 0,
@@ -88,19 +91,34 @@ describe('所得税の申告計算', () => {
     expect(r.businessIncome).toBe(0)
   })
 
-  it('赤字は0円として扱う', () => {
+  it('赤字（損益通算後のマイナス）は合計所得0円として扱う', () => {
     const r = calcIncomeTax(RULES_2026, { ...base, revenue: 100_000, expenses: 300_000 })
     expect(r.profit).toBe(-200_000)
-    expect(r.businessIncome).toBe(0)
+    expect(r.businessIncome).toBe(-200_000)
+    expect(r.totalIncome).toBe(0)
     expect(r.totalTax).toBe(0)
   })
 })
 
 describe('住民税（翌年度）', () => {
-  const common = { socialInsurance: 0, smallBusinessMutualAid: 0, lifeInsuranceDeductionIncomeTax: 0, otherDeductions: 0 }
+  const ded = (rules: typeof RULES_2025, totalIncome: number, extra: Partial<Parameters<typeof calcDeductions>[1]> = {}) =>
+    calcDeductions(rules, {
+      year: rules.year,
+      totalIncome,
+      socialInsurance: 0,
+      smallBusinessMutualAid: 0,
+      lifeInsuranceDeduction: 0,
+      otherDeductions: 0,
+      details: null,
+      ...extra,
+    })
 
   it('課税所得200万円以下', () => {
-    const r = calcResidentTax(RULES_2025, { ...common, totalIncome: 2_850_000, socialInsurance: 500_000 })
+    const r = calcResidentTax(RULES_2025, {
+      totalIncome: 2_850_000,
+      deductions: ded(RULES_2025, 2_850_000, { socialInsurance: 500_000 }),
+      incomeTaxMarginalRate: 0.05,
+    })
     expect(r.taxableIncome).toBe(1_920_000)
     expect(r.adjustmentDeduction).toBe(2_500)
     expect(r.incomeLevyMunicipal).toBe(113_700)
@@ -109,15 +127,177 @@ describe('住民税（翌年度）', () => {
   })
 
   it('課税所得200万円超（調整控除は最低2,500円）', () => {
-    const r = calcResidentTax(RULES_2026, { ...common, totalIncome: 5_350_000, socialInsurance: 800_000 })
+    const r = calcResidentTax(RULES_2026, {
+      totalIncome: 5_350_000,
+      deductions: ded(RULES_2026, 5_350_000, { socialInsurance: 800_000 }),
+      incomeTaxMarginalRate: 0.2,
+    })
     expect(r.taxableIncome).toBe(4_120_000)
     expect(r.adjustmentDeduction).toBe(2_500)
     expect(r.total).toBe(414_500)
   })
 
-  it('生命保険料控除は住民税の上限7万円で概算', () => {
-    const r = calcResidentTax(RULES_2026, { ...common, totalIncome: 3_000_000, lifeInsuranceDeductionIncomeTax: 120_000 })
-    expect(r.totalDeductions).toBe(430_000 + 70_000)
+  it('初期設定の生命保険料控除額は住民税の上限7万円で概算', () => {
+    const d = ded(RULES_2026, 3_000_000, { lifeInsuranceDeduction: 120_000 })
+    expect(d.residentTotal).toBe(430_000 + 70_000)
+  })
+
+  it('ふるさと納税: 基本分＋特例分を所得割から差し引く', () => {
+    const deductions = ded(RULES_2026, 5_000_000, {
+      socialInsurance: 700_000,
+      details: { ...EMPTY_DETAILS, donations: { furusato: 60_000, other: 0 } },
+    })
+    // 所得税の寄附金控除 60,000 − 2,000
+    expect(deductions.lines.find((l) => l.key === 'donation')?.incomeTax).toBe(58_000)
+    const r = calcResidentTax(RULES_2026, { totalIncome: 5_000_000, deductions, incomeTaxMarginalRate: 0.2 })
+    expect(r.taxableIncome).toBe(3_870_000)
+    // 基本分 5,800 ＋ 特例分 58,000×(90%−20%×1.021)=40,356.4 → 市 27,693・県 18,463
+    expect(r.donationCredit).toBe(46_156)
+    expect(r.incomeLevyMunicipal).toBe(203_000)
+    expect(r.incomeLevyPrefectural).toBe(135_300)
+    expect(r.total).toBe(343_300)
+    expect(r.donationCapped).toBe(false)
+  })
+
+  it('ふるさと納税の特例分は所得割の20%が上限', () => {
+    const deductions = ded(RULES_2026, 2_000_000, {
+      socialInsurance: 300_000,
+      details: { ...EMPTY_DETAILS, donations: { furusato: 100_000, other: 0 } },
+    })
+    const r = calcResidentTax(RULES_2026, { totalIncome: 2_000_000, deductions, incomeTaxMarginalRate: 0.05 })
+    expect(r.donationCapped).toBe(true)
+  })
+})
+
+describe('給与所得', () => {
+  it('令和7年分: 最低保障65万円、4,000円単位の計算', () => {
+    expect(salaryIncome(RULES_2025, 1_900_000)).toBe(1_250_000)
+    expect(salaryIncome(RULES_2025, 3_000_000)).toBe(2_020_000)
+    expect(salaryIncome(RULES_2025, 3_003_999)).toBe(2_020_000)
+    expect(salaryIncome(RULES_2025, 5_000_000)).toBe(3_560_000)
+    expect(salaryIncome(RULES_2025, 10_000_000)).toBe(8_050_000)
+    expect(salaryIncome(RULES_2025, 500_000)).toBe(0)
+  })
+
+  it('令和8年分: 最低保障74万円（収入220万円以下）', () => {
+    expect(salaryIncome(RULES_2026, 2_200_000)).toBe(1_460_000)
+    expect(salaryIncome(RULES_2026, 2_000_000)).toBe(1_260_000)
+    expect(salaryIncome(RULES_2026, 3_000_000)).toBe(2_020_000)
+  })
+
+  it('事業の赤字は給与所得と損益通算する', () => {
+    const r = calcIncomeTax(RULES_2025, { ...base, revenue: 1_000_000, expenses: 1_500_000, salaryRevenue: 5_000_000 })
+    expect(r.businessIncome).toBe(-500_000)
+    expect(r.salaryIncome).toBe(3_560_000)
+    expect(r.totalIncome).toBe(3_060_000)
+  })
+})
+
+describe('人的控除', () => {
+  const ded = (year: 2025 | 2026, totalIncome: number, details: Partial<DeductionDetails>) =>
+    calcDeductions(year === 2025 ? RULES_2025 : RULES_2026, {
+      year,
+      totalIncome,
+      socialInsurance: 0,
+      smallBusinessMutualAid: 0,
+      lifeInsuranceDeduction: 0,
+      otherDeductions: 0,
+      details: { ...EMPTY_DETAILS, ...details },
+    })
+  const line = (r: ReturnType<typeof calcDeductions>, key: string) => r.lines.find((l) => l.key === key)
+
+  it('配偶者控除と配偶者特別控除の境界（令和8年分は62万円、令和7年分は58万円）', () => {
+    const spouse = (totalIncome: number) => ({ spouse: { birthDate: '1990-01-01', totalIncome, disability: 'none' as const } })
+    expect(line(ded(2026, 5_000_000, spouse(620_000)), 'spouse')).toMatchObject({ incomeTax: 380_000, resident: 330_000 })
+    expect(line(ded(2026, 5_000_000, spouse(630_000)), 'spouse_special')).toMatchObject({ incomeTax: 380_000, resident: 330_000 })
+    expect(line(ded(2025, 5_000_000, spouse(600_000)), 'spouse_special')).toMatchObject({ incomeTax: 380_000 })
+    expect(line(ded(2026, 5_000_000, spouse(1_100_000)), 'spouse_special')).toMatchObject({ incomeTax: 260_000, resident: 260_000 })
+    expect(line(ded(2026, 9_200_000, spouse(500_000)), 'spouse')).toMatchObject({ incomeTax: 260_000, resident: 220_000 })
+    expect(ded(2026, 10_500_000, spouse(500_000)).lines.some((l) => l.key.startsWith('spouse'))).toBe(false)
+    expect(ded(2026, 5_000_000, spouse(1_400_000)).lines.some((l) => l.key.startsWith('spouse'))).toBe(false)
+  })
+
+  it('老人控除対象配偶者（年末に70歳以上）', () => {
+    const r = ded(2026, 5_000_000, { spouse: { birthDate: '1956-12-31', totalIncome: 0, disability: 'none' } })
+    expect(line(r, 'spouse')).toMatchObject({ label: '配偶者控除（老人）', incomeTax: 480_000, resident: 380_000 })
+  })
+
+  it('扶養控除の区分（年少・一般・特定・同居老親）と人的控除差額', () => {
+    const dep = (label: string, birthDate: string, cohabitingParent = false) => ({
+      label,
+      birthDate,
+      totalIncome: 0,
+      cohabitingParent,
+      disability: 'none' as const,
+    })
+    const r = ded(2026, 5_000_000, {
+      dependents: [dep('長女', '2016-04-01'), dep('長男', '2009-06-01'), dep('次男', '2006-05-01'), dep('父', '1950-01-01', true)],
+    })
+    expect(r.lines.filter((l) => l.key.startsWith('dependent_')).map((l) => [l.incomeTax, l.resident])).toEqual([
+      [380_000, 330_000],
+      [630_000, 450_000],
+      [580_000, 450_000],
+    ])
+    // 基礎5万＋一般5万＋特定18万＋同居老親13万
+    expect(r.humanDifference).toBe(50_000 + 50_000 + 180_000 + 130_000)
+  })
+
+  it('所得要件を超える扶養親族は対象外。19〜22歳は特定親族特別控除の注意を出す', () => {
+    const r = ded(2026, 5_000_000, {
+      dependents: [{ label: '長男', birthDate: '2005-05-01', totalIncome: 800_000, cohabitingParent: false, disability: 'none' }],
+    })
+    expect(r.lines.some((l) => l.key.startsWith('dependent_'))).toBe(false)
+    expect(r.notes.join()).toContain('特定親族特別控除')
+  })
+
+  it('障害者控除（年少扶養親族も対象）・ひとり親控除・本人の所得要件', () => {
+    const r = ded(2026, 4_000_000, {
+      self: { disability: 'none', widow: false, singleParent: 'mother' },
+      dependents: [{ label: '長女', birthDate: '2018-01-01', totalIncome: 0, cohabitingParent: false, disability: 'special' }],
+    })
+    expect(line(r, 'dependent_disability_0')).toMatchObject({ incomeTax: 400_000, resident: 300_000 })
+    expect(line(r, 'single_parent')).toMatchObject({ incomeTax: 350_000, resident: 300_000 })
+    const high = ded(2026, 6_000_000, { self: { disability: 'none', widow: true, singleParent: 'none' } })
+    expect(line(high, 'widow')).toBeUndefined()
+    expect(high.notes.join()).toContain('500万円')
+  })
+})
+
+describe('保険料・医療費・寄附金の控除', () => {
+  const ded = (totalIncome: number, details: Partial<DeductionDetails>) =>
+    calcDeductions(RULES_2026, {
+      year: 2026,
+      totalIncome,
+      socialInsurance: 0,
+      smallBusinessMutualAid: 0,
+      lifeInsuranceDeduction: 999_999,
+      otherDeductions: 0,
+      details: { ...EMPTY_DETAILS, ...details },
+    })
+  const line = (r: ReturnType<typeof calcDeductions>, key: string) => r.lines.find((l) => l.key === key)
+
+  it('生命保険料控除（新契約）は支払額から計算し、初期設定の控除額より優先', () => {
+    expect(lifeInsuranceIncomeTax(30_000)).toBe(25_000)
+    expect(lifeInsuranceIncomeTax(60_000)).toBe(35_000)
+    expect(lifeInsuranceResident(30_000)).toBe(21_000)
+    const r = ded(3_000_000, { lifeInsurance: { general: 100_000, medicalCare: 30_000, pension: 0 } })
+    expect(line(r, 'life_insurance')).toMatchObject({ incomeTax: 65_000, resident: 49_000 })
+  })
+
+  it('地震保険料控除', () => {
+    expect(line(ded(3_000_000, { earthquakeInsurance: 60_000 }), 'earthquake')).toMatchObject({ incomeTax: 50_000, resident: 25_000 })
+    expect(line(ded(3_000_000, { earthquakeInsurance: 30_000 }), 'earthquake')).toMatchObject({ incomeTax: 30_000, resident: 15_000 })
+  })
+
+  it('医療費控除（総所得金額等の5%と10万円の低い方を差し引く）・セルフメディケーション税制', () => {
+    expect(line(ded(1_500_000, { medical: { mode: 'normal', paid: 250_000, reimbursed: 30_000 } }), 'medical')?.incomeTax).toBe(145_000)
+    expect(line(ded(5_000_000, { medical: { mode: 'normal', paid: 250_000, reimbursed: 0 } }), 'medical')?.incomeTax).toBe(150_000)
+    expect(line(ded(5_000_000, { medical: { mode: 'self_medication', paid: 50_000, reimbursed: 0 } }), 'medical')?.incomeTax).toBe(38_000)
+    expect(line(ded(5_000_000, { medical: { mode: 'self_medication', paid: 200_000, reimbursed: 0 } }), 'medical')?.incomeTax).toBe(88_000)
+  })
+
+  it('寄附金控除は総所得金額等の40%が上限', () => {
+    expect(line(ded(100_000, { donations: { furusato: 100_000, other: 0 } }), 'donation')?.incomeTax).toBe(38_000)
   })
 })
 
