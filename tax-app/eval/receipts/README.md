@@ -23,6 +23,8 @@
 
 ```bash
 ANTHROPIC_API_KEY=... RUN_RECEIPT_EVAL=1 npx vitest run src/lib/receipts/eval.test.ts
+# モデルを変えて比べる場合（例: Haiku）
+ANTHROPIC_API_KEY=... RECEIPT_OCR_MODEL=claude-haiku-5-5 RUN_RECEIPT_EVAL=1 npx vitest run src/lib/receipts/eval.test.ts
 ```
 
 結果は `eval/receipts/report.md` に出力されます。

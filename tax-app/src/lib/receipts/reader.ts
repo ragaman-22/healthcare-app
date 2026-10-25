@@ -88,9 +88,9 @@ export async function readReceipt(input: {
     const response = await client.beta.messages.parse({
       model,
       max_tokens: 4000,
-      // 安全性の判定で応答が止まった場合に、別モデルで再実行する（サーバー側のフォールバック）
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
+      // 安全性の判定で応答が止まった場合に、別モデルで再実行する（サーバー側のフォールバック）。
+      // Haiku にはフォールバック先がないため付けない
+      ...(model.includes('haiku') ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }),
       output_config: { effort: 'medium', format: betaZodOutputFormat(ExtractionSchema) },
       system: systemPrompt(input.accounts, input.industry),
       messages: [
