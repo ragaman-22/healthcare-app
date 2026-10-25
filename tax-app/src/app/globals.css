@@ -19,6 +19,24 @@ html {
   scroll-padding-bottom: 6rem;
 }
 
+/* 押したことが分かるように、ボタン・リンクを押している間だけ少し縮めて薄くする */
+a,
+button,
+label,
+summary {
+  -webkit-tap-highlight-color: rgb(37 99 235 / 0.15);
+  transition:
+    transform 80ms ease-out,
+    opacity 80ms ease-out;
+}
+a:active,
+button:not(:disabled):active,
+label:has(> input[type="file"]):active,
+summary:active {
+  transform: scale(0.97);
+  opacity: 0.75;
+}
+
 body {
   background: #f5f7fb;
   color: #0f172a;

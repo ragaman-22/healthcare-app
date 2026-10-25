@@ -29,7 +29,7 @@ async function shrink(file: File): Promise<Blob> {
   }
 }
 
-export function Uploader() {
+export function Uploader({ readable }: { readable: boolean }) {
   const [state, dispatch, pending] = useActionState<FormState, FormData>(uploadReceiptAction, {})
   const [preview, setPreview] = useState<string | null>(null)
   const [blob, setBlob] = useState<Blob | null>(null)
@@ -86,10 +86,12 @@ export function Uploader() {
           <Button type="button" onClick={submit} disabled={pending} className="w-full">
             {pending ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> 読み取り中…（10〜30秒ほどかかります）
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> {readable ? '読み取り中…（10〜30秒ほどかかります）' : '保存中…'}
               </>
-            ) : (
+            ) : readable ? (
               'この画像を読み取る'
+            ) : (
+              'この画像を保存して内容を入力'
             )}
           </Button>
         </Card>

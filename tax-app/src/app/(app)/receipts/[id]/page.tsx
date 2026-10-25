@@ -9,6 +9,7 @@ import { requireBooksContext } from '@/lib/data/context'
 import { listReceipts, loadReceipt } from '@/lib/data/receipts-store'
 import { formatYen } from '@/lib/format'
 import { findDuplicates } from '@/lib/receipts/duplicates'
+import { isReaderConfigured } from '@/lib/receipts/reader'
 import { consistencyNotes } from '@/lib/receipts/sanitize'
 import { ConfirmForm } from './confirm-form'
 
@@ -48,7 +49,12 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
           デモモードのため、画像は読み取っていません。表示されている値はデモ用の仮データです。
         </p>
       )}
-      {ocr?.error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{ocr.error}</p>}
+      {ocr?.error &&
+        (ocr.provider === 'none' ? (
+          <p className="rounded-xl border border-brand-100 bg-brand-50 p-3 text-sm text-brand-700">{ocr.error}</p>
+        ) : (
+          <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{ocr.error}</p>
+        ))}
       {e && !e.isReceipt && (
         <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">レシート・領収書ではない可能性があります。画像を確認してください。</p>
       )}
@@ -118,12 +124,14 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
       <div className="grid gap-2">
         {doc.status === 'pending' && (
           <>
-            <form action={rereadReceiptAction}>
-              <input type="hidden" name="id" value={doc.id} />
-              <Button type="submit" variant="secondary" className="w-full">
-                もう一度読み取る
-              </Button>
-            </form>
+            {(isReaderConfigured() || user.isDemo) && (
+              <form action={rereadReceiptAction}>
+                <input type="hidden" name="id" value={doc.id} />
+                <Button type="submit" variant="secondary" className="w-full">
+                  もう一度読み取る
+                </Button>
+              </form>
+            )}
             <form action={discardReceiptAction}>
               <input type="hidden" name="id" value={doc.id} />
               <Button type="submit" variant="secondary" className="w-full">

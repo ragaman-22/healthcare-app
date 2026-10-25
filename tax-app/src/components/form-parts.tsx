@@ -1,6 +1,7 @@
 'use client'
 
 import clsx from 'clsx'
+import { Loader2 } from 'lucide-react'
 import { startTransition, useActionState, type FormEvent } from 'react'
 import type { FormState } from '@/app/actions/books'
 import { Button, inputClass } from '@/components/ui'
@@ -22,7 +23,13 @@ export function useFormAction<S extends FormState>(action: (prev: FormState, fd:
 export function SubmitButton({ children, className, pending }: { children: React.ReactNode; className?: string; pending: boolean }) {
   return (
     <Button type="submit" disabled={pending} className={clsx('w-full', className)}>
-      {pending ? '保存中…' : children}
+      {pending ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> 保存中…
+        </>
+      ) : (
+        children
+      )}
     </Button>
   )
 }

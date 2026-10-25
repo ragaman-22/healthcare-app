@@ -58,6 +58,11 @@ ${list}
 - usageSuggestion: 利用者の業種（${industry || '不明'}）から見て事業用（business）・私用（private）・混在（mixed）・判断できない（unknown）のいずれか。食料品や日用品など私用の可能性がある場合は、決めつけずに mixed か unknown にして理由を usageReason に書いてください。`
 }
 
+/** 自動読み取り（Claude API）が使えるか。API キーが未設定なら手入力のみ */
+export function isReaderConfigured(): boolean {
+  return !!process.env.ANTHROPIC_API_KEY
+}
+
 export async function readReceipt(input: {
   data: Buffer
   mediaType: ImageMediaType
@@ -65,14 +70,14 @@ export async function readReceipt(input: {
   industry: string
   isDemo: boolean
 }): Promise<ReadResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!isReaderConfigured()) {
     if (input.isDemo) return demoResult(input.accounts)
     return {
       provider: 'none',
       model: null,
       extraction: null,
       raw: null,
-      error: '読み取りサービスが設定されていません。内容を手入力してください。',
+      error: '自動読み取りは準備中です。画像は保存しました。下の欄にレシートの内容を入力してください。',
       isDemo: false,
     }
   }
