@@ -32,13 +32,14 @@ test.describe('認証と公開範囲', () => {
     expect(h['x-powered-by']).toBeUndefined()
   })
 
-  test('他人のデータ（存在しないID）は404', async ({ page }) => {
+  test('他人のデータ（存在しないID）は「見つかりません」と表示', async ({ page }) => {
     await page.goto('/login')
     await page.getByRole('button', { name: 'サンプルデータで試す' }).click()
     await page.waitForURL('**/home')
     for (const path of ['/sales/00000000-0000-0000-0000-000000000000', '/receipts/00000000-0000-0000-0000-000000000000', '/return/history/00000000-0000-0000-0000-000000000000']) {
-      const res = await page.goto(path)
-      expect(res?.status()).toBe(404)
+      // 画面の切り替え中の表示（loading.tsx）があるため、HTTP ステータスは 200 で返り、404 の画面（noindex）が表示される
+      await page.goto(path)
+      await expect(page.getByRole('heading', { name: 'ページが見つかりません' })).toBeVisible()
     }
   })
 })
