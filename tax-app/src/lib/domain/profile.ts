@@ -82,8 +82,23 @@ export interface TaxYearProfile {
   localSettings: LocalSettings | null
   /** 利用者が自分で取り置いている金額（口座残高ではなく、自己申告の目安） */
   reservedAmount: number | null
-  /** 年末予測の手入力補正（年末までの残りの見込み）。null は月平均で予測 */
-  forecastAdjustment: { remainingRevenue: number | null; remainingExpenses: number | null } | null
+  /** 利用者が手入力した今年1年間の売上・経費の見込み。null は登録した金額だけで計算 */
+  forecastAdjustment: AnnualForecast | null
+}
+
+export interface AnnualForecast {
+  annualRevenue: number | null
+  annualExpenses: number | null
+}
+
+/** 保存値を読み込む（以前の「残りの見込み」形式は使わない） */
+export function parseAnnualForecast(v: unknown): AnnualForecast | null {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : null)
+  const annualRevenue = num(o.annualRevenue)
+  const annualExpenses = num(o.annualExpenses)
+  return annualRevenue === null && annualExpenses === null ? null : { annualRevenue, annualExpenses }
 }
 
 export function emptyProfile(taxYear: number): TaxYearProfile {

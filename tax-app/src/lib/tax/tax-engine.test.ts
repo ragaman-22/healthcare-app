@@ -351,33 +351,25 @@ describe('個人事業税・消費税', () => {
   })
 })
 
-describe('年末予測', () => {
-  it('月平均で年末まで延長', () => {
-    const r = forecastYearEnd({
-      taxYear: 2026,
-      ytdRevenue: 3_000_000,
-      ytdExpenses: 600_000,
-      asOf: '2026-06-30',
-      businessStartDate: null,
-    })
-    expect(r.monthsElapsed).toBeCloseTo(6)
-    expect(r.monthsRemaining).toBeCloseTo(6)
-    expect(r.projectedRevenue).toBe(6_000_000)
-    expect(r.projectedExpenses).toBe(1_200_000)
-    expect(r.confidence).toBe('medium')
+describe('年間の見込み', () => {
+  it('見込みを入力しなければ、登録した金額のまま（自動で延長しない）', () => {
+    const r = forecastYearEnd({ ytdRevenue: 1_200_000, ytdExpenses: 100_000 })
+    expect(r.basis).toBe('actual')
+    expect(r.projectedRevenue).toBe(1_200_000)
+    expect(r.projectedExpenses).toBe(100_000)
   })
 
-  it('年途中の開業は開業日から計算', () => {
-    const r = forecastYearEnd({
-      taxYear: 2026,
-      ytdRevenue: 1_000_000,
-      ytdExpenses: 0,
-      asOf: '2026-08-31',
-      businessStartDate: '2026-07-01',
-    })
-    expect(r.monthsElapsed).toBeCloseTo(2)
-    expect(r.projectedRevenue).toBe(3_000_000)
-    expect(r.confidence).toBe('low')
+  it('入力した年間の見込みを使う。経費が空欄なら登録した金額', () => {
+    const r = forecastYearEnd({ ytdRevenue: 1_200_000, ytdExpenses: 100_000, annualRevenue: 6_000_000, annualExpenses: null })
+    expect(r.basis).toBe('manual')
+    expect(r.projectedRevenue).toBe(6_000_000)
+    expect(r.projectedExpenses).toBe(100_000)
+  })
+
+  it('登録した金額が見込みを超えたら実績を使う', () => {
+    const r = forecastYearEnd({ ytdRevenue: 7_000_000, ytdExpenses: 900_000, annualRevenue: 6_000_000, annualExpenses: 1_000_000 })
+    expect(r.projectedRevenue).toBe(7_000_000)
+    expect(r.projectedExpenses).toBe(1_000_000)
   })
 })
 
@@ -405,6 +397,7 @@ describe('ダッシュボード集計', () => {
       ytdRevenue: 4_000_000,
       ytdExpenses: 1_000_000,
       ytdAsOf: '2026-06-30',
+      forecastAdjustment: { annualRevenue: 8_000_000, annualExpenses: 2_000_000 },
     }
     const r = buildDashboard(p, '2026-07-01')
     if ('error' in r) throw new Error(r.error)
@@ -429,8 +422,10 @@ describe('ダッシュボード集計', () => {
     })
     if ('error' in r) throw new Error(r.error)
     expect(r.dataSource).toBe('books')
-    expect(r.forecast.projectedRevenue).toBe(6_000_000)
-    expect(r.forecast.projectedExpenses).toBe(1_200_000 + 50_000)
+    // 年間の見込みを入力していないので、登録した金額（自動で延長しない）
+    expect(r.forecast.basis).toBe('actual')
+    expect(r.forecast.projectedRevenue).toBe(3_000_000)
+    expect(r.forecast.projectedExpenses).toBe(600_000 + 50_000)
     expect(r.alreadyPaidIncomeTax).toBe(120_000)
   })
 

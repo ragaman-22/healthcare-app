@@ -69,7 +69,7 @@ export function DeductionsForm({
   year: number
   details: DeductionDetails | null
   salary: SalaryIncome | null
-  /** 事業所得の年末予測（プレビュー用） */
+  /** 事業所得（ホームと同じ計算。プレビュー用） */
   businessIncome: number
   /** 初期設定の社会保険料・小規模共済・その他控除（プレビュー用） */
   socialInsuranceOther: { socialInsurance: number; smallBusiness: number; lifeInsurance: number; other: number }

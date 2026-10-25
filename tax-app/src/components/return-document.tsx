@@ -47,7 +47,7 @@ export function ReturnDocument({ data, saved }: { data: TaxReturnData; saved?: {
         <p className="font-bold">{st.label}</p>
         <p className="mt-1 text-xs leading-relaxed">
           {data.year}年分・{formName}と所得税の確定申告書に転記する金額です。正式な様式ではありません。
-          {!data.final && ' 年の途中のため、年末予測による見込みの金額です。'}
+          {!data.final && ' 年の途中のため、これまでに登録した金額による途中の計算です。'}
           {data.status !== 'checked' && ' このまま提出用として使わないでください。'}
         </p>
         <p className="mt-1 text-[11px]">

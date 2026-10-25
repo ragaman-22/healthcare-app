@@ -2,7 +2,7 @@ import 'server-only'
 import { dbError } from './errors'
 import { cookies } from 'next/headers'
 import { EMPTY_DETAILS, type DeductionDetails, type SalaryIncome } from '@/lib/domain/deductions'
-import { emptyProfile, type LocalSettings, type TaxYearProfile } from '@/lib/domain/profile'
+import { emptyProfile, parseAnnualForecast, type LocalSettings, type TaxYearProfile } from '@/lib/domain/profile'
 import { createClient } from '@/lib/supabase/server'
 import type { NhiRates } from '@/lib/tax/types'
 import { DEMO_PROFILE_COOKIE } from './demo'
@@ -72,7 +72,7 @@ export async function loadProfile(user: SessionUser): Promise<TaxYearProfile | n
     ytdAsOf: setting.ytd_as_of,
     localSettings: (setting.local_settings as LocalSettings | null) ?? null,
     reservedAmount: toNum(setting.reserved_amount),
-    forecastAdjustment: (setting.forecast_adjustment as TaxYearProfile['forecastAdjustment']) ?? null,
+    forecastAdjustment: parseAnnualForecast(setting.forecast_adjustment),
   }
   for (const d of deductions ?? []) {
     const field = DEDUCTION_FIELDS[d.kind as DeductionKind]

@@ -147,7 +147,7 @@ export function Simulator({
       </Card>
 
       <Card className="space-y-4">
-        <SectionTitle>変更する内容（{profile.taxYear}年の年末予測に加えます）</SectionTitle>
+        <SectionTitle>変更する内容（{profile.taxYear}年の売上・経費に加えます）</SectionTitle>
         <YenInput label="売上の増減（税込）" value={c.revenueChange} onChange={(v) => set({ revenueChange: v })} signed />
         <YenInput
           label="全額その年の経費になる支出"

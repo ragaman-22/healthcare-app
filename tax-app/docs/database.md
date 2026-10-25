@@ -182,7 +182,7 @@ CHECK 制約：源泉徴収税額 < 金額、入金日 ≥ 計上日、経費に
 
 ## 8. 第6段階・第7段階のテーブル
 
-- `tax_year_settings.forecast_adjustment jsonb`（年末までの残りの売上・経費の見込み）
+- `tax_year_settings.forecast_adjustment jsonb`（利用者が手入力した今年1年間の売上・経費の見込み `{annualRevenue, annualExpenses}`。以前の「残りの見込み」形式は読み込み時に無視）
 - `tax_year_settings.closed_at`（年次締めの日時）
 - `journal_entries.source` に `closing`（締め時に保存した減価償却）・`opening`（翌年1月1日の期首残高）を追加
 - トリガー `guard_closed_year`: 締めた年の取引・仕訳・明細・固定資産の作成・変更・削除を拒否（締めた年より後の除却日・メモの変更のみ可）。締め処理の中だけ `app.closing` 設定で許可

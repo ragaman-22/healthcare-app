@@ -12,12 +12,6 @@ import { formatYen } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'ホーム｜おかねと税金ノート' }
 
-const CONFIDENCE = {
-  low: { label: '精度: 低', tone: 'amber' },
-  medium: { label: '精度: 中', tone: 'blue' },
-  high: { label: '精度: 高', tone: 'green' },
-} as const
-
 export default async function HomePage() {
   const user = await requireUser()
   const profile = await loadProfile(user)
@@ -37,7 +31,10 @@ export default async function HomePage() {
 
   const [, m, d] = s.asOf.split('-').map(Number)
   const nextPayments = schedule.filter((i) => i.kind !== 'paid' && i.amount > 0 && i.dueDate >= today).slice(0, 3)
-  const conf = CONFIDENCE[s.forecast.confidence]
+  const manual = s.forecast.basis === 'manual'
+  const profitLabel = manual ? '年間の見込み' : 'これまでに登録した分'
+  // 減価償却費（年額）は登録した経費に含めて表示する（税金の計算と同じ）
+  const registeredExpenses = s.ytd.expenses + s.depreciation
   const filingTotal = s.filingLines.filter((l) => l.key !== 'income_tax_total')
   const nextYearTotal = s.nextYearLines.reduce((sum, l) => sum + (l.amount ?? 0), 0)
 
@@ -52,12 +49,12 @@ export default async function HomePage() {
 
       {/* 計算上の残額 */}
       <Card className="border-brand-100 bg-gradient-to-br from-brand-600 to-brand-700 text-white">
-        <p className="text-xs font-medium text-blue-100">今年の利益（年末予測）から、今年分の所得税等を差し引くと</p>
+        <p className="text-xs font-medium text-blue-100">今年の利益（{profitLabel}）から、今年分の所得税等を差し引くと</p>
         <p className="num mt-1 text-3xl font-bold tracking-tight">{formatYen(s.remainingAfterFiling)}</p>
         <p className="text-xs text-blue-100">が残る計算です</p>
 
         <dl className="mt-4 space-y-1.5 rounded-xl bg-white/10 p-3 text-sm">
-          <Flow label="事業の利益（年末予測）" value={s.forecast.profit} />
+          <Flow label={`事業の利益（${profitLabel}）`} value={s.forecast.profit} />
           <Flow label="源泉徴収・予定納税（支払済み）" value={-s.alreadyPaidIncomeTax} />
           {filingTotal.map((l) => (
             <Flow key={l.key} label={l.label} value={l.amount === null ? null : -l.amount} />
@@ -78,40 +75,43 @@ export default async function HomePage() {
 
       {/* 売上・経費・利益 */}
       <Card>
-        <SectionTitle aside={<Badge tone={conf.tone}>{conf.label}</Badge>}>売上・経費・利益</SectionTitle>
+        <SectionTitle aside={<Badge tone={manual ? 'blue' : 'green'}>{manual ? '見込みで計算' : '登録した金額で計算'}</Badge>}>売上・経費・利益</SectionTitle>
         <table className="num w-full text-sm">
           <thead>
             <tr className="text-xs text-slate-500">
               <th className="pb-2 text-left font-medium" />
-              <th className="pb-2 text-right font-medium">現在までの実績</th>
-              <th className="pb-2 text-right font-medium">年末予測</th>
+              <th className="pb-2 text-right font-medium">登録した金額</th>
+              {manual && <th className="pb-2 text-right font-medium">年間の見込み</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             <tr>
               <th className="py-2 text-left font-medium">売上</th>
               <td className="py-2 text-right">{formatYen(s.ytd.revenue)}</td>
-              <td className="py-2 text-right text-slate-600">{formatYen(s.forecast.projectedRevenue)}</td>
+              {manual && <td className="py-2 text-right text-slate-600">{formatYen(s.forecast.projectedRevenue)}</td>}
             </tr>
             <tr>
               <th className="py-2 text-left font-medium">経費</th>
-              <td className="py-2 text-right">{formatYen(s.ytd.expenses)}</td>
-              <td className="py-2 text-right text-slate-600">{formatYen(s.forecast.projectedExpenses)}</td>
+              <td className="py-2 text-right">{formatYen(registeredExpenses)}</td>
+              {manual && <td className="py-2 text-right text-slate-600">{formatYen(s.forecast.projectedExpenses)}</td>}
             </tr>
             <tr>
               <th className="py-2 text-left font-bold">利益</th>
-              <td className="py-2 text-right font-bold">{formatYen(s.ytd.profit)}</td>
-              <td className="py-2 text-right font-bold text-slate-700">{formatYen(s.forecast.profit)}</td>
+              <td className="py-2 text-right font-bold">{formatYen(s.ytd.revenue - registeredExpenses)}</td>
+              {manual && <td className="py-2 text-right font-bold text-slate-700">{formatYen(s.forecast.profit)}</td>}
             </tr>
           </tbody>
         </table>
         <p className="mt-2 text-xs text-slate-500">
-          <Link href="/forecast" className="float-right ml-2 font-semibold text-brand-600 underline">
-            予測を修正
-          </Link>
-          予測方法: {s.forecast.method}
-          {s.depreciation > 0 && `。減価償却費 ${formatYen(s.depreciation)}（年額）は予測の経費に含めています`}
+          {s.forecast.method}
+          {s.depreciation > 0 && `。減価償却費 ${formatYen(s.depreciation)}（年額）を経費に含めています`}
         </p>
+        <Link
+          href="/forecast"
+          className="mt-3 flex min-h-11 items-center justify-center rounded-xl border border-brand-600 text-sm font-semibold text-brand-600"
+        >
+          {manual ? '年間の見込みを変更する' : '年間の見込み売上を入力する'}
+        </Link>
       </Card>
 
       {/* 申告時に精算 */}

@@ -5,22 +5,21 @@ import { loadDashboard } from '@/lib/data/dashboard'
 import { buildDashboard } from '@/lib/tax/dashboard'
 import { ForecastForm } from './forecast-form'
 
-export const metadata: Metadata = { title: '年末予測の修正｜おかねと税金ノート' }
+export const metadata: Metadata = { title: '年間の見込み｜おかねと税金ノート' }
 
 export default async function ForecastPage() {
   const { user, profile } = await requireBooksContext()
   const { actuals, notices, today } = await loadDashboard(user, profile)
-  // 手入力の補正をしない場合の予測（月平均）を参考として表示する
-  const avg = buildDashboard({ ...profile, forecastAdjustment: null }, today, actuals, notices)
-  const remainingRevenue = 'error' in avg ? 0 : avg.forecast.projectedRevenue - avg.ytd.revenue
-  const remainingExpenses = 'error' in avg ? 0 : avg.forecast.projectedExpenses - avg.ytd.expenses - avg.depreciation
+  // 見込みを入力しない場合の金額（登録した金額）を参考として表示する
+  const actual = buildDashboard({ ...profile, forecastAdjustment: null }, today, actuals, notices)
+  const ytd = 'error' in actual ? { revenue: 0, expenses: 0 } : actual.ytd
   return (
     <div>
-      <PageHeader title="年末予測の修正" back="/home" />
+      <PageHeader title="年間の見込み（売上・経費）" back="/home" />
       <p className="mb-4 text-xs leading-relaxed text-slate-500">
-        大きな入金の予定や、季節による売上の変動がある場合は、年末までの残りの見込みを入力してください。空欄の項目は、これまでの月平均で予測します。
+        今年1年間で、売上と経費が合計いくらになりそうかを入力すると、その金額で税金を計算します。空欄のままなら、これまでに登録した金額だけで計算します。
       </p>
-      <ForecastForm current={profile.forecastAdjustment} averageRevenue={Math.max(0, remainingRevenue)} averageExpenses={Math.max(0, remainingExpenses)} />
+      <ForecastForm current={profile.forecastAdjustment} ytdRevenue={ytd.revenue} ytdExpenses={ytd.expenses} />
     </div>
   )
 }

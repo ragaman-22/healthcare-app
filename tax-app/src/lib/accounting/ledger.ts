@@ -83,7 +83,7 @@ export function incomeStatement(entries: JournalEntry[], accounts: Account[], ye
   return { revenues, expenses, totalRevenue, totalExpenses, profit: totalRevenue - totalExpenses }
 }
 
-/** 月別の売上・経費（年末予測・入力漏れチェックに使用） */
+/** 月別の売上・経費（入力漏れチェックに使用） */
 export function monthlyTotals(entries: JournalEntry[], accounts: Map<string, Account>, year: number) {
   const months = Array.from({ length: 12 }, () => ({ revenue: 0, expenses: 0 }))
   for (const e of entries) {

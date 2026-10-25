@@ -47,3 +47,14 @@ test('シミュレーション: 経費を使うと手元に残るお金は減る
   await page.getByRole('button', { name: '売上 +50万円' }).click()
   await expect(page.getByText(/税率が上がるのは境界を超えた部分だけ/)).toBeVisible()
 })
+
+test('年間の見込み: 入力しなければ登録した金額、入力すればその金額で計算', async ({ page }) => {
+  await startSampleDemo(page)
+  await expect(page.getByText('登録した金額で計算').first()).toBeVisible()
+  await page.getByRole('link', { name: '年間の見込み売上を入力する' }).click()
+  await field(page, '今年1年間の売上の見込み').fill('50000000')
+  await page.getByRole('button', { name: '保存してホームへ' }).click()
+  await page.waitForURL('**/home')
+  await expect(page.getByText('見込みで計算')).toBeVisible()
+  await expect(page.getByRole('cell', { name: '50,000,000円' })).toBeVisible()
+})

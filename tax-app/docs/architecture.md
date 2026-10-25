@@ -58,7 +58,7 @@ tax-app/
 │       │   ├── nhi.ts         国民健康保険料
 │       │   ├── business-tax.ts 個人事業税
 │       │   ├── consumption-tax.ts 消費税
-│       │   ├── forecast.ts    年末予測
+│       │   ├── forecast.ts    年間の見込み（手入力。自動の延長はしない）
 │       │   └── dashboard.ts   ダッシュボード集計（各モジュールの組み合わせ）
 │       ├── domain/            申告設定の型・入力検証
 │       ├── data/              データアクセス（Supabase／デモモード）

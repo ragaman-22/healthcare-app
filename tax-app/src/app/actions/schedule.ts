@@ -140,19 +140,16 @@ export async function saveLocalSettingsAction(_prev: FormState, fd: FormData): P
   redirect('/schedule?saved=1')
 }
 
-/** 年末予測の手入力補正（空欄は月平均で予測） */
+/** 今年1年間の売上・経費の見込み（空欄は登録した金額だけで計算） */
 export async function saveForecastAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const { user, profile } = await requireBooksContext()
-  const read = (k: string) => {
-    const raw = String(fd.get(k) ?? '').trim()
-    return raw === '' ? null : parseYen(raw)
+  const raw = (k: string) => String(fd.get(k) ?? '').trim()
+  const annualRevenue = raw('annualRevenue') === '' ? null : parseYen(raw('annualRevenue'))
+  const annualExpenses = raw('annualExpenses') === '' ? null : parseYen(raw('annualExpenses'))
+  if ((raw('annualRevenue') && annualRevenue === null) || (raw('annualExpenses') && annualExpenses === null)) {
+    return { error: '金額は0以上の整数で入力してください（空欄は登録した金額だけで計算します）' }
   }
-  const remainingRevenue = read('remainingRevenue')
-  const remainingExpenses = read('remainingExpenses')
-  if ((String(fd.get('remainingRevenue') ?? '').trim() && remainingRevenue === null) || (String(fd.get('remainingExpenses') ?? '').trim() && remainingExpenses === null)) {
-    return { error: '金額は0以上の整数で入力してください（空欄は月平均で予測）' }
-  }
-  const forecastAdjustment = remainingRevenue === null && remainingExpenses === null ? null : { remainingRevenue, remainingExpenses }
+  const forecastAdjustment = annualRevenue === null && annualExpenses === null ? null : { annualRevenue, annualExpenses }
   const res = await saveLocalSettings(user, profile, { forecastAdjustment })
   if (res.error) return res
   redirect('/home')

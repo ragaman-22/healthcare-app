@@ -50,7 +50,7 @@ export interface DashboardSummary {
   /** 売上・経費の出どころ（帳簿の取引 or 初期設定の概算入力） */
   dataSource: 'books' | 'estimate'
   ytd: { revenue: Yen; expenses: Yen; profit: Yen }
-  /** その年の減価償却費（年額。年末予測にそのまま加える） */
+  /** その年の減価償却費（年額。経費にそのまま加える） */
   depreciation: Yen
   forecast: ForecastResult & { profit: Yen }
   incomeTax: IncomeTaxResult
@@ -81,7 +81,7 @@ export function buildDashboard(
   actuals?: BookActuals,
   /** 通知書で確定した翌年度の金額（住民税・国保・事業税） */
   notices: TaxNotice[] = [],
-  /** シミュレーション用: 年末予測に加える売上・経費 */
+  /** シミュレーション用: 今年の売上・経費に加える金額 */
   adjust: DashboardAdjust = {},
 ): DashboardSummary | { error: string } {
   const rules = getRules(profile.taxYear)
@@ -96,15 +96,12 @@ export function buildDashboard(
   const depreciation = useBooks ? actuals.depreciation : 0
 
   const forecast = forecastYearEnd({
-    taxYear: profile.taxYear,
     ytdRevenue,
     ytdExpenses,
-    asOf,
-    businessStartDate: profile.businessStartDate,
-    remainingRevenue: profile.forecastAdjustment?.remainingRevenue ?? null,
-    remainingExpenses: profile.forecastAdjustment?.remainingExpenses ?? null,
+    annualRevenue: profile.forecastAdjustment?.annualRevenue ?? null,
+    annualExpenses: profile.forecastAdjustment?.annualExpenses ?? null,
   })
-  // 減価償却費は年額で確定しているため、月平均で延長せずにそのまま加える
+  // 減価償却費は年額で確定しているため、経費にそのまま加える
   forecast.projectedExpenses += depreciation
   forecast.projectedRevenue += adjust.revenue ?? 0
   forecast.projectedExpenses += adjust.expenses ?? 0
@@ -269,11 +266,11 @@ export function buildDashboard(
       detail: '売上・経費を登録すると、帳簿の集計にもとづく計算に切り替わります。',
     })
   }
-  if (forecast.confidence === 'low') {
+  if (forecast.basis === 'actual') {
     warnings.push({
-      level: 'warning',
-      title: '予測の精度が低い状態です',
-      detail: '実績期間が3か月未満のため、年末予測は大きくずれる可能性があります。',
+      level: 'info',
+      title: 'これまでに登録した金額で計算しています',
+      detail: '年末までに増える売上・経費は含みません。1年間の見込みで税金を知りたい場合は「年間の見込み」に金額を入力してください。',
     })
   }
   if (profile.filingType === 'unknown' || (profile.filingType === 'blue' && profile.blueDeductionType === 'unknown')) {

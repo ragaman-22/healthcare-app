@@ -43,7 +43,7 @@ export default async function TaxesPage({ searchParams }: { searchParams: Promis
       </Link>
 
       <Card>
-        <SectionTitle>所得税の計算（{s.taxYear}年分・年末予測ベース）</SectionTitle>
+        <SectionTitle>所得税の計算（{s.taxYear}年分・{s.forecast.basis === 'manual' ? '年間の見込み' : '登録した金額'}で計算）</SectionTitle>
         <dl className="num divide-y divide-slate-100 text-sm">
           <Row label="収入金額（売上）" value={s.forecast.projectedRevenue} />
           <Row label="必要経費" value={-s.forecast.projectedExpenses} />

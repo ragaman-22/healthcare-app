@@ -25,7 +25,7 @@ export interface ReturnRow {
 export interface TaxReturnData {
   year: number
   formType: 'blue' | 'white'
-  /** 年が終わり、帳簿の実績で計算したか（false は年末予測による見込み） */
+  /** 年が終わり、帳簿の実績で計算したか（false は年の途中の計算） */
   final: boolean
   calculatedOn: string
   ruleVersion: string
@@ -59,7 +59,7 @@ export function buildTaxReturn(input: {
   const yearEnd = `${year}-12-31`
   const final = today > yearEnd
   const calcDate = final ? yearEnd : today
-  // 申告書は帳簿の実績で計算する（手入力の年末予測の補正は使わない）
+  // 申告書は帳簿の実績で計算する（手入力の年間の見込みは使わない）
   const summary = buildDashboard({ ...profile, forecastAdjustment: null }, calcDate, bookActuals(books, year), input.notices)
   if ('error' in summary) return summary
   const it = summary.incomeTax
@@ -128,7 +128,7 @@ export function buildTaxReturn(input: {
   // ---- 確認事項 ----
   const checks: ReturnCheck[] = []
   const add = (level: CheckLevel, message: string, href?: string) => checks.push({ level, message, href })
-  if (!final) add('error', `${year}年が終わっていないため、年末予測による見込みです。年明けに実績で作成してください。`)
+  if (!final) add('error', `${year}年が終わっていないため、これまでに登録した金額による途中の計算です。年明けに1年分の実績で作成してください。`)
   if (summary.dataSource !== 'books') add('error', '帳簿に取引が登録されていないため、決算書を作成できません。', '/sales')
   if (final && !isClosed(books, year)) add('error', '年次締めが済んでいません。帳簿の内容を確認して締めてください。', '/return')
   if (profile.hasOtherIncome === 'yes') add('unsupported', '給与以外の所得（年金・不動産・株式など）があるため、このアプリでは申告書を完成できません。')

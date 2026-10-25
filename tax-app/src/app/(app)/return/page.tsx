@@ -60,7 +60,7 @@ export default async function ReturnPage({ searchParams }: { searchParams: Promi
             <dd className="font-bold">{formatYen(tax?.amount)}</dd>
           </div>
         </dl>
-        {!r.final && <p className="text-xs text-amber-800">年の途中のため、年末予測による見込みです。</p>}
+        {!r.final && <p className="text-xs text-amber-800">年の途中のため、これまでに登録した金額による途中の計算です。</p>}
         <Link href="/return/preview" className="inline-block text-sm font-semibold text-brand-600 underline">
           決算書・確定申告書の金額を見る
         </Link>

@@ -21,7 +21,7 @@ const LINKS = [
   { href: '/risks', label: '税務上の注意点' },
   { href: '/receipts', label: 'レシート・領収書' },
   { href: '/simulate', label: '節税・収入シミュレーション' },
-  { href: '/forecast', label: '年末予測の修正' },
+  { href: '/forecast', label: '年間の見込み（売上・経費）' },
   { href: '/return', label: '年次締め・確定申告書の作成' },
   { href: '/settings/data', label: 'データ管理（書き出し・削除）' },
   { href: '/terms', label: '利用規約' },
