@@ -4,6 +4,8 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'おかねと税金ノート｜個人事業主・フリーランスの税金管理',
   description: '日々の売上・経費から、今年の税金と翌年度の負担、税引き後に残る金額を確認できるサービス',
+  // iPhone のホーム画面に追加したときの名前と表示
+  appleWebApp: { title: '税金ノート', capable: true, statusBarStyle: 'default' },
 }
 
 export const viewport: Viewport = {

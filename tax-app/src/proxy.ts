@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { DEMO_SESSION_COOKIE } from '@/lib/data/demo'
 
-const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/terms', '/privacy', '/robots.txt']
+const PUBLIC_PATHS = ['/login', '/signup', '/auth', '/terms', '/privacy', '/robots.txt', '/manifest.webmanifest', '/icon', '/apple-icon']
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
