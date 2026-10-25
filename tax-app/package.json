@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:db": "bash scripts/test-db.sh",
     "test:e2e": "playwright test",
-    "check": "npm run lint && npm run typecheck && npm test && npm run build"
+    "check": "npm run lint && npm run typecheck && npm test && npm run build",
+    "db:bundle": "bash scripts/bundle-migrations.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",
